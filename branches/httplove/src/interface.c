@@ -3182,14 +3182,15 @@ initializesock(int s, struct huinfo *hu, int ctype, int cport, int welcome)
 #endif
          ctype == CT_PUEBLO)
             && tp_ascii_descrs) {
-        d->encoding = 1; /* ASCII I/O */
+        d->encoding = ENC_ASCII;
     } else {
-        d->encoding = 0; /* RAW I/O */
+        d->encoding = ENC_RAW;
     }
     /* UTF-8 is a channel upgrade - never a default */
 
 #ifdef NEWHTTPD
     if (ctype == CT_HTTP)
+        d->encoding = ENC_ASCII;
         http_initstruct(d);     /* hinoserm */
 #endif /* NEWHTTPD */
 
@@ -3382,7 +3383,7 @@ queue_string(struct descriptor_data *d, const char *s)
     const char *send = s + len - 1;
 #endif
 
-    if (d->encoding == 1) { /* ASCII */
+    if (d->encoding == ENC_ASCII) {
         filtered = (char *) malloc(len + 1);
         fp = filtered;
         fend = filtered + len;
@@ -3395,7 +3396,7 @@ queue_string(struct descriptor_data *d, const char *s)
             }
         }
 #ifdef UTF8_SUPPORT
-    } else if (d->encoding == 2) { /* UTF-8 */
+    } else if (d->encoding == ENC_UTF8) { /* UTF-8 */
 		/* each invalid byte of s potentially maps to three UTF-8 bytes */
 		wchar_t wctmp;
 		int wclen;
@@ -3663,7 +3664,7 @@ process_input(struct descriptor_data *d)
 
         d->raw_input_at = d->raw_input;
 #ifdef UTF8_SUPPORT
-        if (d->encoding == 0) {
+        if (d->encoding == ENC_RAW) {
             wcbuflen = -1; /* invalid UTF-8 */
         } else {
             wcbuflen = 0;
@@ -3861,10 +3862,10 @@ process_input(struct descriptor_data *d)
 									   OBTW: if both ASCII and UNICODE re requested, prefer unicode.
 									*/
 									if (strcasestr2(buf2,"ascii") || strcasestr2(buf2, "ANSI_X3.4-1968") || strcasestr2(buf2,"UTF-8")) {
-										if ((d->encoding < 2) && ((strcasestr2(buf2,"ascii")) || strcasestr2(buf2, "ANSI_X3.4-1968")))
-											d->encoding = 1;
+										if ((d->encoding < ENC_UTF8) && ((strcasestr2(buf2,"ascii")) || strcasestr2(buf2, "ANSI_X3.4-1968")))
+											d->encoding = ENC_ASCII;
 										else
-											d->encoding = 2;
+											d->encoding = ENC_UTF8;
 									}
 									queue_write(d, buf2, dpos+1);
 									accepted_charsets++;
@@ -3988,7 +3989,7 @@ process_input(struct descriptor_data *d)
                      * indiscriminately overwritten since it was already
                      * validated when we accepted the input. */
 
-                    if (!isascii(*p) && d->encoding == 2) { /* UTF-8 */
+                    if (!isascii(*p) && d->encoding == ENC_UTF8) {
                         do {
                             p--;
                         } while ( (*p >= '\x80') && (*p <= '\xbf') );
@@ -3997,7 +3998,7 @@ process_input(struct descriptor_data *d)
 #endif
                 }
             } else if (*q != 13) {
-                if (d->encoding == 1) { /* ASCII */
+                if (d->encoding == ENC_ASCII) {
                     if (isascii(*q)) {
                         *p++ = *q;
 #ifdef UTF8_SUPPORT
@@ -4006,7 +4007,7 @@ process_input(struct descriptor_data *d)
 
                     }
 #ifdef UTF8_SUPPORT
-                } else if (d->encoding == 2) { /* UTF-8 */
+                } else if (d->encoding == ENC_UTF8) {
                     wclen = mbtowc(wctmp, q, qend - q);
 
                     /* TODO: Consider filtering private use and block specifier
@@ -4892,9 +4893,15 @@ do_dinfo(dbref player, const char *arg)
         /* need to print out the flags */
         anotify_nolisten(player, descr_flag_description(d->descriptor), 1);
 
-	anotify_fmt(player, SYSAQUA "Termtype: " SYSCYAN "%s    Encoding: %s", 
+	anotify_fmt(player, SYSAQUA "Termtype: "
+                        SYSCYAN "%s    "
+                        SYSAQUA "Encoding: "
+                        SYSCYAN" %s", 
 	    (d->telopt.termtype ? d->telopt.termtype : "<unknown>"),
-	    (d->encoding ? (d->encoding==1 ? "ASCII-7" : "UTF-8") : "RAW" ));
+	    (d->encoding == ENC_RAW ? "RAW" :
+            (d->encoding == ENC_ASCII ? "US-ASCII" :
+                 (d->encoding == ENC_UTF8 ? "UTF-8" : SYSRED "UNKNOWN"))));
+	    //(d->encoding ? (d->encoding == ENC_ASCII ? "US-ASCII" : "UTF-8") : "RAW" ));
 
     if (Arch(player))
         anotify_fmt(player, SYSAQUA "Host: " SYSCYAN "%s" SYSBLUE "@"

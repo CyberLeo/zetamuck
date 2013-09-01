@@ -46,6 +46,11 @@
 #define TELOPT_MSSP_VAL '\x02'
 #define TELOPT_CHARSET  '\x2A'
 
+#define ENC_RAW         0
+#define ENC_ASCII       1
+#define ENC_LATIN1      2 /* not actually used yet */
+#define ENC_UTF8        3 /* must be highest, per our telopt processing */
+
 #ifdef MCCP_ENABLED
 #define COMPRESS_BUF_SIZE 16384 /* This will use 16k for every descriptor that has MCCP enabled */
 #endif

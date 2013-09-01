@@ -42,6 +42,9 @@
 #include "tune.h"
 #include "cgi.h"
 #include "mpi.h"
+#ifdef JSON_SUPPORT
+#include "json.h"
+#endif
 
 #define MALLOC(result, type, number) { if (!((result) = (type *)malloc((number)*sizeof(type)))) \
                                          panic("Out of memory"); }
@@ -123,6 +126,7 @@ struct http_mimestruct http_mimetypes[] = {
     {"tar", "application/x-tar"},
     {"js", "application/javascript"},
     {"xml", "application/xml"},
+    {"json", "application/json"},
     {"mp3", "audio/mpeg"},
     {"ra", "audio/x-realaudio"},
     {"wav", "audio/x-wav"},
@@ -591,6 +595,9 @@ http_makearray(struct descriptor_data *d)
 {
     stk_array *nw = new_array_dictionary();
     char *p = d->http->body.data;
+#ifdef JSON_SUPPORT
+    stk_array *jsonerr;
+#endif
 
     array_set_strkey_intval(&nw, "DESCR", d->descriptor);
     array_set_strkey_intval(&nw, "CONNECTED", d->connected);
@@ -636,12 +643,25 @@ http_makearray(struct descriptor_data *d)
                 array_appenditem(&nw2, &temp1);
                 array_set_strkey_strval(&nw3, f->field, f->data);
                 CLEAR(&temp1);
+#ifdef JSON_SUPPORT
+                if (!string_compare(d->http->method, "POST") &&
+                        !string_compare(f->field, "Content-Type") &&
+                        string_prefix(f->data, "application/json")) {
+                    /* note: since we're not setting JSON_REJECT_DUPLICATES, the
+                     *       last participant in a key collision will win. */
+                    array_set_strkey_arrval(&nw, "JSON", jdecode_array(d->http->body.data, 0, &jsonerr));
+                    array_set_strkey_arrval(&nw, "JSONError", jsonerr);
+                }
+#endif
             }
         }
 
         array_set_strkey_arrval(&nw, "HeaderFields", nw2);
         array_set_strkey_arrval(&nw, "HeaderData", nw3);
     }
+#ifdef JSON_SUPPORT
+
+#endif
 
     return nw;
 }
@@ -1086,7 +1106,7 @@ http_process_input(struct descriptor_data *d, const char *input)
 {
     struct http_field *f;
     char buf[BUFFER_LEN];
-    char *p, *q;
+    char *p, *q, *r;
     int i;
 
     if (d->http->body.elen || d->booted || d->type != CT_HTTP)
@@ -1102,11 +1122,25 @@ http_process_input(struct descriptor_data *d, const char *input)
     d->last_time = time(NULL);
     d->commands++;
 
+
     if (!strlen(buf)) {
         /* Empty string means bare newline. */
         if (!d->http->smethod)
             http_processheader(d);
         return;
+    }
+
+    // Scan input for badness. Bounce them if we find it.
+    for (r = buf; *r != '\0'; r++) {
+        if (!isprint(*r)) {
+            d->encoding = ENC_RAW; // http_processheader will bail on this
+            if (!d->http->method) {
+                http_log(d, 1, "WWW: %d ? '<garbage>' %s(%s)\n", d->descriptor,
+                        d->hu->h->name, d->hu->u->user);
+            }
+            http_processheader(d);
+            return;
+        }
     }
 
     if (!d->http->method) {
@@ -1172,7 +1206,7 @@ http_processheader(struct descriptor_data *d)
         return;
     }
 
-    if (!d->http->method || (d->http->method && !*d->http->method)
+    if (!d->http->method || !d->encoding || (d->http->method && !*d->http->method)
         || !d->http->dest || !d->http->ver || (d->http->ver
                                                && !*d->http->ver)) {
         /* No method? Bad request. */
