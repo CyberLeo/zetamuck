@@ -3189,9 +3189,10 @@ initializesock(int s, struct huinfo *hu, int ctype, int cport, int welcome)
     /* UTF-8 is a channel upgrade - never a default */
 
 #ifdef NEWHTTPD
-    if (ctype == CT_HTTP)
+    if (ctype == CT_HTTP) {
         d->encoding = ENC_ASCII;
         http_initstruct(d);     /* hinoserm */
+    }
 #endif /* NEWHTTPD */
 
     if (welcome
