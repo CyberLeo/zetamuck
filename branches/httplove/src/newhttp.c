@@ -590,9 +590,12 @@ http_makearray(struct descriptor_data *d)
 {
     stk_array *nw = new_array_dictionary();
     char *p = d->http->body.data;
+    char buf[BUFFER_LEN];
 #ifdef JSON_SUPPORT
     stk_array *jsonerr;
 #endif
+
+    sprintf(buf, "/%s", d->http->newdest);
 
     array_set_strkey_intval(&nw, "DESCR", d->descriptor);
     array_set_strkey_intval(&nw, "CONNECTED", d->connected);
@@ -608,7 +611,7 @@ http_makearray(struct descriptor_data *d)
     array_set_strkey_strval(&nw, "HTTPVer", d->http->ver);
     array_set_strkey_intval(&nw, "SID", d->descriptor);
     array_set_strkey_intval(&nw, "Flags", d->http->flags);
-    array_set_strkey_strval(&nw, "URI", d->http->newdest);
+    array_set_strkey_strval(&nw, "URI", buf);
 
     if ((d->http->smethod->flags & HS_BODY) && d->http->body.len && p) {
         array_set_strkey_intval(&nw, "BODYLen", d->http->body.len);
