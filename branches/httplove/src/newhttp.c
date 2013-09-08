@@ -322,7 +322,7 @@ http_sendheader(struct descriptor_data *d, int statcode,
     if (content_length >= 0)
         queue_text(d, "Content-Length: %d\r\n", content_length);
 
-    if (content_type)
+    if (content_type && *content_type)
         queue_text(d, "Content-Type: %s\r\n", content_type);
     else
         queue_text(d, "Content-Type: text/plain\r\n");
@@ -459,15 +459,13 @@ http_parsedest(struct descriptor_data *d)
 {
     char buf[BUFFER_LEN];
     char buf2[BUFFER_LEN];
-    char *cgi, *frag, *dir = NULL;
+    char *cgi, *dir = NULL;
     char *p, *q;
     const char *s;
     dbref ref = NOTHING;
 
     strcpy(buf, d->http->dest);
 
-    // URI fragment is always the rightmost URI component per RFC2396 -davin
-    frag = http_split(buf, '#');
     cgi = http_split(buf, '?');
 
     for (p = buf; *p && *p == '/'; p++) ;
@@ -523,7 +521,6 @@ http_parsedest(struct descriptor_data *d)
     else
         d->http->rootdir = string_dup("/_/www");
 
-    d->http->fragment = string_dup(frag);
     d->http->cgidata = string_dup(cgi);
     d->http->newdest = string_dup(p);
     d->http->rootobj = ref;
@@ -533,8 +530,6 @@ http_parsedest(struct descriptor_data *d)
     http_log(d, 4, "ROOTDIR: '%s'\n", d->http->rootdir);
     if (cgi && *cgi)
         http_log(d, 5, "CGIDATA: '%s'\n", d->http->cgidata);
-    if (frag && *frag)
-        http_log(d, 5, "FRAGMENT: '%s'\n", d->http->fragment);
 
     return 0;
 
@@ -614,7 +609,6 @@ http_makearray(struct descriptor_data *d)
     array_set_strkey_intval(&nw, "SID", d->descriptor);
     array_set_strkey_intval(&nw, "Flags", d->http->flags);
     array_set_strkey_strval(&nw, "URI", d->http->newdest);
-    array_set_strkey_strval(&nw, "Fragment", d->http->fragment);
 
     if ((d->http->smethod->flags & HS_BODY) && d->http->body.len && p) {
         array_set_strkey_intval(&nw, "BODYLen", d->http->body.len);
@@ -739,8 +733,8 @@ http_dohtmuf(struct descriptor_data *d, const char *prop)
         http_sendheader(d, 200, buf, -1, 1);
 
     /* Do it! */
-    sprintf(match_args, "%d|%s|%s|%s|%s", d->descriptor, d->hu->h->name,
-            d->hu->u->user, d->http->cgidata, d->http->fragment);
+    sprintf(match_args, "%d|%s|%s|%s", d->descriptor, d->hu->h->name,
+            d->hu->u->user, d->http->cgidata);
     strcpy(match_cmdname, "(WWW)");
     tmpfr =
         interp(d->descriptor, player, NOTHING, ref, d->http->rootobj,
@@ -1300,7 +1294,6 @@ http_initstruct(struct descriptor_data *d)
         d->http->rootobj = NOTHING;
         d->http->rootdir = NULL;
         d->http->smethod = NULL;
-        d->http->fragment = NULL;
         d->http->cgidata = NULL;
         d->http->newdest = NULL;
         d->http->method = NULL;
@@ -1339,8 +1332,6 @@ http_deinitstruct(struct descriptor_data *d)
         free((void *) d->http->method);
     if (d->http->rootdir)
         free((void *) d->http->rootdir);
-    if (d->http->fragment)
-        free((void *) d->http->fragment);
     if (d->http->cgidata)
         free((void *) d->http->cgidata);
     if (d->http->newdest)

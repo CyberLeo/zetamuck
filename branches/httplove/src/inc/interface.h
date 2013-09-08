@@ -94,7 +94,6 @@ struct http_struct {        /* hinoserm */  /***********************************
     struct http_method      *smethod;       /* The method, in struct form.      */
     struct http_field       *fields;        /* The fields linked-list.          */
     char                    *rootdir;       /* The propdir the data is in.      */
-    char                    *fragment;      /* Stuff after the '#' in the URI.  */
     char                    *cgidata;       /* Stuff after the '?' in the URI.  */
     char                    *newdest;       /* The URI after parsing.           */
     char                    *method;        /* The method, in string form.      */

@@ -1961,7 +1961,10 @@ shovechars(void)
                                                            !(descr_running_queue
                                                              (d->descriptor)
                                                              || d->output.
-                                                             lines))))
+                                                             lines)
+                                                           &&
+                                                           !(d->type == CT_HTTP &&
+                                                               in_timequeue(d->http->pid)))))
                     || (d->type == CT_MUF
                         && !descr_running_queue(d->descriptor))
                     || (d->type == CT_INBOUND && d->booted == 1)) {

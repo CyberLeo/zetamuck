@@ -210,7 +210,7 @@ prim_httpsendheader(PRIM_PROTOTYPE)
         abort_interp("Non-HTTP connection. (1)");
 
     http_sendheader(d, oper4->data.number, 
-                    oper3->data.string->data, oper2->data.number,
+                    DoNullInd(oper3->data.string), oper2->data.number,
                     oper1->data.number);
 
     CLEAR(oper1);
