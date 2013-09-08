@@ -3188,6 +3188,34 @@ prim_base64decode(PRIM_PROTOTYPE)
     }
 }
 
+void
+prim_notify_descriptor_nocr(PRIM_PROTOTYPE)
+{
+    char buf[BUFFER_LEN * 2];
+
+    CHECKOP(2);
+    oper1 = POP();
+    oper2 = POP();
+    if (mlev < LBOY)
+        abort_interp("W4 primitive.");
+    if (oper1->type != PROG_STRING)
+        abort_interp("Non-string argument (2)");
+    if (oper2->type != PROG_INTEGER)
+        abort_interp("Descriptor integer expected. (1)");
+    if (!pdescrp(oper2->data.number)) {
+        CLEAR(oper1);
+        CLEAR(oper2);
+        return;
+    }
+    if (oper1->data.string) {
+        strcpy(buf, oper1->data.string->data);
+        notify_descriptor_raw(oper2->data.number, buf, strlen(buf)+1);
+    }
+    CLEAR(oper1);
+    CLEAR(oper2);
+}
+
+
 #ifdef UTF8_SUPPORT
 /* refer to comments for wcharlen in stringutil.c */
 

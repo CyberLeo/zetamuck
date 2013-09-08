@@ -1011,6 +1011,7 @@ int
 http_dourl(struct descriptor_data *d)
 {
     char prop[BUFFER_LEN];
+    char *p;
     int i;
 
     if (!OkObj(d->http->rootobj)) {
@@ -1022,6 +1023,17 @@ http_dourl(struct descriptor_data *d)
     i = strlen(prop);
     while ((i-- > 0) && (prop[i] == '/'))
         prop[i] = '\0';
+
+    // Deny access to internal /_blah props. -davin
+    p = prop + i;
+    while (*p != '/' && p != prop) {
+        p--;
+    }
+    if (*(++p) == '_') {
+        http_senderror(d, 403, "Access denied.");
+        return 0;
+    }
+
 
     if ((d->http->smethod->flags & HS_PROPLIST)
         && http_doproplist(d, d->http->rootobj, prop, 200))

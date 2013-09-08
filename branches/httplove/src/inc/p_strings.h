@@ -57,6 +57,7 @@ extern void prim_ansi_unparseobj(PRIM_PROTOTYPE);
 extern void prim_ansi_name(PRIM_PROTOTYPE);
 extern void prim_base64encode(PRIM_PROTOTYPE);
 extern void prim_base64decode(PRIM_PROTOTYPE);
+extern void prim_notify_descriptor_nocr(PRIM_PROTOTYPE);
 
 #ifdef UTF8_SUPPORT
 extern void prim_wcharlen(PRIM_PROTOTYPE);
@@ -78,7 +79,7 @@ extern void prim_wcharlen_slice(PRIM_PROTOTYPE);
     prim_ansi_midstr, prim_textattr, prim_parse_neon, prim_notify_descriptor, \
     prim_flag_2char, prim_power_2char, prim_notify_descriptor_char,           \
     prim_array_fmtstrings, prim_ansi_unparseobj, prim_ansi_name, prim_base64encode,    \
-    prim_base64decode, prim_wcharlen, prim_wcharlen_slice
+    prim_notify_descriptor_nocr, prim_base64decode, prim_wcharlen, prim_wcharlen_slice
 
 #define PRIMS_STRINGS_NAMES "NUMBER?", "STRINGCMP", "STRCMP",        \
     "STRNCMP", "STRCUT", "STRLEN", "STRCAT", "ATOI",                 \
@@ -95,9 +96,9 @@ extern void prim_wcharlen_slice(PRIM_PROTOTYPE);
     "TEXTATTR", "PARSE_NEON", "DESCRNOTIFY", "FLAG_2CHAR",           \
     "POWER_2CHAR", "NOTIFY_DESCRIPTOR_CHAR", "ARRAY_FMTSTRINGS",     \
     "ANSI_UNPARSEOBJ", "ANSI_NAME", "BASE64ENCODE", "BASE64DECODE",  \
-    "WCHARLEN", "WCHARLEN_SLICE"
+    "NOTIFY_DESCRIPTOR_NOCR", "WCHARLEN", "WCHARLEN_SLICE"
 
-#define PRIMS_STRINGS_CNT 62
+#define PRIMS_STRINGS_CNT 63
 
 #else /* UTF8_SUPPORT */
 
@@ -117,7 +118,7 @@ extern void prim_wcharlen_slice(PRIM_PROTOTYPE);
     prim_ansi_midstr, prim_textattr, prim_parse_neon, prim_notify_descriptor, \
     prim_flag_2char, prim_power_2char, prim_notify_descriptor_char,           \
     prim_array_fmtstrings, prim_ansi_unparseobj, prim_ansi_name, prim_base64encode,    \
-    prim_base64decode
+    prim_base64decode, prim_notify_descriptor_nocr
 
 #define PRIMS_STRINGS_NAMES "NUMBER?", "STRINGCMP", "STRCMP",        \
     "STRNCMP", "STRCUT", "STRLEN", "STRCAT", "ATOI",                 \
@@ -133,9 +134,10 @@ extern void prim_wcharlen_slice(PRIM_PROTOTYPE);
     "ANSI_STRLEN", "ANSI_STRCUT", "ANSI_STRIP", "ANSI_MIDSTR",       \
     "TEXTATTR", "PARSE_NEON", "DESCRNOTIFY", "FLAG_2CHAR",           \
     "POWER_2CHAR", "NOTIFY_DESCRIPTOR_CHAR", "ARRAY_FMTSTRINGS",     \
-    "ANSI_UNPARSEOBJ", "ANSI_NAME", "BASE64ENCODE", "BASE64DECODE"
+    "ANSI_UNPARSEOBJ", "ANSI_NAME", "BASE64ENCODE", "BASE64DECODE",  \
+    "NOTIFY_DESCRIPTOR_NOCR"
 
-#define PRIMS_STRINGS_CNT 60
+#define PRIMS_STRINGS_CNT 61
 
 
 #endif /* WIN_VC */
