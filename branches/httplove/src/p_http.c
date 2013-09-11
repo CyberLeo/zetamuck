@@ -179,45 +179,49 @@ prim_httpsendheader(PRIM_PROTOTYPE)
 {
     struct descriptor_data *d;
 
-    // ( iDescr iStatusCode sContentType iContentLength bTerminateHeaders -- )
+    // ( iDescr iStatusCode sContentType iContentLength bTerminateHeaders bClose -- )
     CHECKOP(5);
     oper1 = POP();
     oper2 = POP();
     oper3 = POP();
     oper4 = POP();
     oper5 = POP();
+    oper6 = POP();
 
     if (oper1->type != PROG_INTEGER)
-        abort_interp("Header termination integer expected. (5)");
-    if (oper1->data.number != 1 && oper1->data.number != 0)
-        abort_interp("Header termination integer must be 1 or 0. (5)");
+        abort_interp("Connection close preference integer expected. (6)");
     if (oper2->type != PROG_INTEGER)
+        abort_interp("Header termination integer expected. (5)");
+    if (oper2->data.number != 1 && oper1->data.number != 0)
+        abort_interp("Header termination integer must be 1 or 0. (5)");
+    if (oper3->type != PROG_INTEGER)
         abort_interp("Content length integer expected. (4)");
-    if (oper2->data.number < 0)
+    if (oper3->data.number < 0)
         abort_interp("Content length must be >= 0. (4)");
-    if (oper3->type != PROG_STRING)
+    if (oper4->type != PROG_STRING)
         abort_interp("Content type string expected. (3)");
     // string can be anything, even null.
-    if (oper4->type != PROG_INTEGER)
-        abort_interp("Status code integer expected. (2)");
     if (oper5->type != PROG_INTEGER)
+        abort_interp("Status code integer expected. (2)");
+    if (oper6->type != PROG_INTEGER)
         abort_interp("Descriptor integer expected. (1)");
     if (mlev < LMAGE)
         abort_interp("MAGE prim.");
-    if (!(d = descrdata_by_descr(oper5->data.number)))
+    if (!(d = descrdata_by_descr(oper6->data.number)))
         abort_interp("Invalid descriptor. (1)");
     if (d->type != CT_HTTP)
         abort_interp("Non-HTTP connection. (1)");
 
-    http_sendheader(d, oper4->data.number, 
-                    DoNullInd(oper3->data.string), oper2->data.number,
-                    oper1->data.number);
+    http_sendheader(d, oper5->data.number, 
+                    DoNullInd(oper4->data.string), oper3->data.number,
+                    oper2->data.number, oper1->data.number);
 
     CLEAR(oper1);
     CLEAR(oper2);
     CLEAR(oper3);
     CLEAR(oper4);
     CLEAR(oper5);
+    CLEAR(oper6);
 }
 
 

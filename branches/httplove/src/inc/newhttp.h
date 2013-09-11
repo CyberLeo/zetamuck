@@ -13,7 +13,9 @@ extern const char *http_statlookup(int status);
 extern struct http_method *http_methodlookup(const char *method);
 extern struct http_field  *http_fieldlookup(struct descriptor_data *d, const char *field);
 extern const char *http_gethost(struct descriptor_data *d);
-extern void http_sendheader(struct descriptor_data *d, int statcode, const char *content_type, int content_length, bool terminate_headers);
+extern void http_sendheader(struct descriptor_data *d, int statcode,
+                            const char *content_type, int content_length,
+                            bool terminate_headers, bool close);
 extern void http_sendredirect(struct descriptor_data *d, const char *url);
 extern void http_senderror(struct descriptor_data *d, int statcode, const char *msg);
 extern int http_parsedest(struct descriptor_data *d);

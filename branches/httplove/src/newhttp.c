@@ -300,11 +300,17 @@ http_gethost(struct descriptor_data *d)
 /*   Create and send an HTTP header based on the info   */
 /*   provided. If content_type isn't given, it defaults */
 /*   to 'text/plain'. If content_length is below zero,  */
-/*   it won't be given.                                 */
+/*   it won't be given. -hinoserm                       */
+/*   terminate_headers specifies whether or not the
+ *   game should end the headers with a CRLF; false is
+ *   usually only sent by HTMUF. While close indicates
+ *   that the close flag should be set, it's possible
+ *   that the flag has been set *already* before we got
+ *   here. (i.e. client requested it.) */
 void
 http_sendheader(struct descriptor_data *d, int statcode,
                 const char *content_type, int content_length,
-                bool terminate_headers)
+                bool terminate_headers, bool close)
 {
     struct http_field *f;
     //int iscompressed=0;
@@ -315,9 +321,14 @@ http_sendheader(struct descriptor_data *d, int statcode,
     format_time(tbuf, BUFFER_LEN, "%a, %d %b %Y %T GMT", localtime(&t));
 
     queue_text(d, "HTTP/1.1 %d %s\r\nDate: %s\r\n"
-               "Server: ProtoMUCK/%s\r\n"
-               "Connection: close\r\n",
+               "Server: ProtoMUCK/%s\r\n",
                statcode, http_statlookup(statcode), tbuf, PROTOBASE);
+
+    if (close)
+        d->http->close = 1;
+
+    if (d->http->close)
+        queue_text(d, "Connection: close\r\n");
 
     if (content_length >= 0)
         queue_text(d, "Content-Length: %d\r\n", content_length);
@@ -374,6 +385,7 @@ http_sendredirect(struct descriptor_data *d, const char *url)
                statmsg, tbuf, PROTOBASE, buf2, strlen(buf));
     queue_text(d, buf);
 
+    d->http->close = 1;
     d->booted = 4;
 
     free((void *) host);
@@ -401,7 +413,7 @@ http_senderror(struct descriptor_data *d, int statcode, const char *msg)
             "</body></html>\r\n", statcode, statmsg, statmsg, msg, PROTOBASE,
             host, d->cport);
 
-    http_sendheader(d, statcode, "text/html; charset=iso-8859-1", strlen(buf), 1);
+    http_sendheader(d, statcode, "text/html; charset=iso-8859-1", strlen(buf), 1, 0);
     queue_text(d, buf);
 
     free((void *) host);
@@ -733,7 +745,7 @@ http_dohtmuf(struct descriptor_data *d, const char *prop)
 
     /* Send the header. */
     if (string_compare(buf, "noheader"))
-        http_sendheader(d, 200, buf, -1, 1);
+        http_sendheader(d, 200, buf, -1, 1, 0);
 
     /* Do it! */
     sprintf(match_args, "%d|%s|%s|%s", d->descriptor, d->hu->h->name,
@@ -805,7 +817,7 @@ http_doproplist(struct descriptor_data *d, dbref what, const char *prop,
     d->http->flags |= HS_PROPLIST;
     /* Send the header. */
     if (string_compare(buf, "noheader"))
-        http_sendheader(d, statcode, buf, -1, 1);
+        http_sendheader(d, statcode, buf, -1, 1, 0);
 
     /* Send the list. */
     for (i = 1; i <= lines; i++) {
@@ -852,7 +864,7 @@ http_sendfile(struct descriptor_data *d, const char *filename)
 
     /* This should send out proper file dates. */
 
-    http_sendheader(d, 200, type, i, 1);
+    http_sendheader(d, 200, type, i, 1, 0);
     descr_sendfileblock(d);
 
     return 1;
@@ -887,7 +899,7 @@ http_listdir(struct descriptor_data *d, const char *dir, DIR * df)
         return;
     }
 
-    http_sendheader(d, 200, "text/html; charset=iso-8859-1", -1, 1);
+    http_sendheader(d, 200, "text/html; charset=iso-8859-1", -1, 1, 0);
     queue_text(d,
                "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 3.2 Final//EN\">\r\n"
                "<html><head>\r\n<title>Index of /%s</title>\r\n</head><body>"
@@ -998,7 +1010,7 @@ http_doprop(struct descriptor_data *d, const char *prop)
 
         /* Send the header. */
         if (string_compare(buf, "noheader"))
-            http_sendheader(d, 200, buf, -1, 1);
+            http_sendheader(d, 200, buf, -1, 1, 0);
 
         queue_text(d, http_parsempi(d, d->http->rootobj, ++m, buf));
     } else {
@@ -1146,9 +1158,12 @@ http_process_input(struct descriptor_data *d, const char *input)
             if (!d->http->method) {
                 http_log(d, 1, "WWW: %d ? '<garbage>' %s(%s)\n", d->descriptor,
                         d->hu->h->name, d->hu->u->user);
+                // if they didn't even get the method right, get rid of them now
+                d->http->close = 1;
+                http_processheader(d);
+                return;
             }
-            http_processheader(d);
-            return;
+            break;
         }
     }
 
@@ -1238,6 +1253,12 @@ http_processheader(struct descriptor_data *d)
         return;
     }
 
+    if (d->http->fields && (f = http_fieldlookup(d, "Connection"))
+        && (!string_compare(f->data, "close"))) {
+        /* Client is done talking with us after this request. Honor it. */
+        d->http->close = 1;
+    }
+
     if (d->http->fields && (d->http->smethod->flags & HS_BODY)
         && (f = http_fieldlookup(d, "Content-Length"))) {
         /* Handle message-body stuff. */
@@ -1291,6 +1312,13 @@ http_finish(struct descriptor_data *d)
         http_log(d, 4, "BODY:    '%s' (%d)\n", d->http->body.data,
                  d->http->body.len);
 
+    /* If we've gotten this far, the client is waiting for us to respond. 
+     * We set the DF_POLLING flag here so that the connection is immune to
+     * idleboot processing. This flag gets reset in interface.c when d->http is
+     * reinitialized for the next persistent connection. */
+
+    DR_RAW_ADD_FLAGS(d, DF_POLLING);
+
     if (http_parsedest(d))
         return;
 
@@ -1317,6 +1345,7 @@ http_initstruct(struct descriptor_data *d)
         d->http->ver = NULL;
         d->http->flags = 0;
         d->http->pid = 0;
+        d->http->close = 0;
 
         d->http->body.data = NULL;
         d->http->body.elen = 0;

@@ -1,17 +1,28 @@
 /*
- * Revision 1.4  2001/02/17 12:22:25  alynna 
- * Make this thing compile flawlessly under CYGWIN  
+ * Revision 1.5  2013/09/10 -davin
  *
- * Revision 1.3  2000/06/27 22:32:17  moose
- * Edited for ProtoMUCK
+ * Read this. Yes, you, that person who wants to start scrolling down.
+ * While a number of features used to be enabled through this file, many of them
+ * have been moved to the ./configure script and should no longer be enabled here.
  *
- * Revision 1.2  1996/09/19 05:45:35  jtraub
- * removed define for in-server HackAndSlash code
+ * Things that have been moved to ./configure include:
+ *
+ * SSL Support (--with-ssl)
+ * MySQL Support (--with-mysql)
+ * External Resolver (--enable-reslvd...which will be ignored in favor of the
+ *                    threaded resolver anyway if your platform supports it)
  *
  *
- * config.h
+ * Things that have been gutted entirely:
  *
- * Tunable parameters -- Edit to you heart's content 
+ * VERBOSELOAD -- Use ./protomuck -verboseload instead.
+ *
+ * PROTO_AS_ROOT --  We really shouldn't endorse this at all. If you find
+ * yourself needing to bind to a privileged port (usually 80), set up a proxy
+ * in front of the game. In the case of a webserver, make sure you're logging the
+ * X-Forwarded-For HTTP header so that you're tracking the actual client IP.
+ *
+ *
  *
  */
 #ifndef __CONFIG_H
@@ -28,23 +39,6 @@
  are compiled in.
  ************************************************************************/
 
-/* UTF8_SUPPORT support will be moved to ./configure, it lives here for now.
- * It is undefined by default. There is currently a bug in the password
- * hashing routines when this is defined (players can't connect), so only use
- * this with unencrypted databases for the time being.
- *
- * This code is currently unmaintained. */
-#undef UTF8_SUPPORT
-
-/* This define has no effect unless UTF8_SUPPORT is enabled. When both are
- * defined, the C library's string sorting order ("collation") will continue to
- * use the old "ANSI C" standard. Undefining LEGACY_COLLATION will switch
- * character sorting to using the Unicode collation order, which won't be what
- * most people expect. (i.e. "foobar" sorts before ".foobar", but ".foobar"
- * sorts before "foobaz")
- *
- * When in doubt, leave this defined. */
-#define LEGACY_COLLATION
 
 /* Alynna - Lets make something so that later on it will see the CYGWIN 
  * edits.  If this is defined, it will use CYGWIN edits.  Usually CYGWIN
@@ -71,15 +65,6 @@
  #define CYGWIN_TZX "PST" 
  */
 
-/* Alynna - Define this for SSL support */
-/* Note: Use ./configure --with-ssl */
-/* Todo: Rename this to SSL_SUPPORT */
-/* IMPORTANT:  This is now automatically controlled by the --with-ssl
- * configure option, and will soon be removed from this file.
-*/
-
-/* #define USE_SSL */
-
 /* Define this to enable support for the experimental resolver daemon.
  * If this is enabled, ProtoMUCK will attempt to connect to the daemon
  *  as per the address stored in the reslvd_address @tune.  #define
@@ -87,8 +72,6 @@
  *  isn't set.  Note that these also affect the defaults when building
  *  the resolver daemon itself as well.
  */
-/* You can also control this using configure --enable-reslvd */
-#undef USE_RESLVD
 #define RESOLVER_HOST "127.0.0.1" /* I suggest using only an IP here. */
 #define RESOLVER_PORT 12111
 
@@ -127,7 +110,7 @@
  */
 
 /* Be aware, this is slightly resource intensive. -Hinoserm */
-#define IGNORE_SUPPORT
+#undef IGNORE_SUPPORT
 #define MAX_IGNORES 64
 #define MUF_MAX_IGNORES "64"
 
@@ -143,20 +126,6 @@
  */
 #undef NO_SYSCOLOR
 
-/* Define this to compile with MySQL support. MySQL must be installed
- * somewhere on your system. When compiling with this option, you
- * MUST run ./configure --with-mysql in the proto/src directory
- * in order to include the necessary MySQL libraries. 
- * If the mysql headers are in the normal /user/include/mysql/
- * location, then it will find it fine. Otherwise, type:
- * ./configure --with-mysql=<path to the mysql headers>
- */
-/* IMPORTANT:  This is now automatically controlled by the
- * --with-mysql configure option, and will soon be removed from this
- * file.
-*/
-
-/* #undef SQL_SUPPORT */
 
 /* Define FILE_PRIMS to compile in a set of W4 level file-access
  * and control prims. The file prims are often a problem when
@@ -166,27 +135,6 @@
  */
 
 #define FILE_PRIMS
-
-/* ACHTUNG!  PELIGRO!  DANGER!
- * DO NOT DEFINE UNDER PENALTY OF LAW.  This define is DANGEROUS.
- * Define this if you want to run Proto as root, and still have 
- * access to things like file primitives and other potential
- * compromises.  If you want to use ProtoMUCK as a webserver on
- * a privileged port (<=1024, like 80), it's recommended that you
- * do NOT turn this define on, and instead use a proxying webserver
- * that drops root privileges after the port bind. (ProtoMUCK does
- * not do this)  You can usually configure a proxying webserver to
- * proxy traffic sent to the root URI (/) if that is what you are
- * trying to accomplish, but note that you will need to refer to
- * the proxy's logs in order to get the real IP address of clients
- * (or extract it from a header like X-Forwarded-For).
- *
- */
-/* Made this into a configure option, available via:
- *   ./configure --enable-asroot
- * -Hinoserm
- */
-/* #undef PROTO_AS_ROOT */
 
 /* Define MUF_SOCKETS to include the MUF socket prims.
  * MUF socket support is necessary for any MUF programs
@@ -242,6 +190,24 @@
 /* This is the section to turn on and off cutting edge features.
  */
 
+/* UTF8_SUPPORT support will be moved to ./configure, it lives here for now.
+ * It is undefined by default. There is currently a bug in the password
+ * hashing routines when this is defined (players can't connect), so only use
+ * this with unencrypted databases for the time being.
+ *
+ * This code is currently unmaintained. */
+#undef UTF8_SUPPORT
+
+/* This define has no effect unless UTF8_SUPPORT is enabled. When both are
+ * defined, the C library's string sorting order ("collation") will continue to
+ * use the old "ANSI C" standard. Undefining LEGACY_COLLATION will switch
+ * character sorting to using the Unicode collation order, which won't be what
+ * most people expect. (i.e. "foobar" sorts before ".foobar", but ".foobar"
+ * sorts before "foobaz")
+ *
+ * When in doubt, leave this defined. */
+#define LEGACY_COLLATION
+
 /* Define HIDDEN_CHLK to move the chown lock prop from /_/chlk to /@/chlk.
  * Players can still modify the chown lock via the @chlock command, but won't
  * be able to modify the prop directly. This isn't particularly useful unless
@@ -257,7 +223,7 @@
  * @find =TC
  * @find =EC
  *
- * -brevantes
+ * -davin
  */
 #undef HIDDEN_CHLK
 
@@ -267,7 +233,7 @@
  * blocking them from using the @chlock command.
  *
  * You may define this without HIDDEN_CHLK if your site was already using it,
- * but you do so at your own risk. -brevantes
+ * but you do so at your own risk. -davin
  */
 #undef CONTROLS_SUPPORT	/* Alynna 20030907 */
 
@@ -320,9 +286,6 @@
 
 #define TINYPORT      4567    /* Port that tinymuck uses for playing */
 
-/* Debugging info for database loading */
-/* Alynna - Obsoleted, use -verboseload command line option */
-/* #undef VERBOSELOAD */
 
 /* More intensive database debugging. At the moment, this enables */
 /*  a valid_object check on every access to database objects.     */
@@ -338,7 +301,7 @@
 /* sent to the connection log because it exposes user passwords. You can     */
 /* #define DEBUGLOGINS below if you need to troubleshoot these strings.      */
 /* Normal users *should not* do this, because it completely defeats the      */
-/* on-disk security of hashed passwords in the database. -brevantes          */
+/* on-disk security of hashed passwords in the database. -davin              */
 #undef DEBUGLOGINS
 
 /* Define this to make various system related @tune options changable */

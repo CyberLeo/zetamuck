@@ -1953,8 +1953,9 @@ shovechars(void)
             if (d->dfile)
                 descr_sendfileblock(d);
 #endif /* DESCRFILE_SUPPORT */
-            /* booted = 3 means immediate clean drop */
-            /* booted = 4 means safeboot -hinoserm */
+            /* booted == 2 means QUIT command */
+            /* booted == 3 means immediate clean drop */
+            /* booted == 4 means safeboot -hinoserm */
             if (d->booted) {
                 if ((d->booted != 3 && (d->booted != 4 || (d->booted == 4
                                                            &&
@@ -1995,8 +1996,15 @@ shovechars(void)
                         announce_disclogin(d);
 #ifdef NEWHTTPD
                     if ((d->type == CT_HTTP) && !(d->flags & DF_HALFCLOSE)) {
-                        d->flags |= DF_HALFCLOSE;
-                        shutdown(d->descriptor, 1);
+                        if (!d->http->close) {
+                            // HTTP/1.1 persistent connections -davin
+                            http_deinitstruct(d);
+                            DR_RAW_REM_FLAGS(d, DF_POLLING);
+                            http_initstruct(d);
+                        } else {
+                            d->flags |= DF_HALFCLOSE;
+                            shutdown(d->descriptor, 1);
+                        }
                     } else
 #endif /* NEWHTTP */
                     if (d->type != CT_INBOUND) { /* Don't touch MUF sockets */
@@ -2004,8 +2012,7 @@ shovechars(void)
                         continue; /* this is important, it keeps the FD_SET() code below from breaking. */
                     }
                 }               /* if d->booted != 3 */
-            }
-            /* if (d->booted) */
+            } /* if (d->booted) */
             if (d->input.lines > 100)
                 timeout = slice_timeout;
             else
@@ -2407,6 +2414,25 @@ shovechars(void)
                             DR_RAW_ADD_FLAGS(d, DF_IDLE);
                         announce_idle(d);
                     }
+#ifdef NEWHTTPD
+                    /* 20 second idle window for HTTP sessions; behaviors
+                     * modeled after what Apache httpd does. HTTP sessions with
+                     * a DF_POLLING flag are immune to booting, which is useful
+                     * if the client is waiting on us. (i.e. long polls)
+                     *                                           -davin */
+                    if (d->type == CT_HTTP && dr_idletime >= 20 &&
+                            !(d->flags & DF_POLLING) && !(d->booted)) {
+                        d->http->close = 1;
+                        if (d->http->method) {
+                            // wave goodbye if they were behaving so far...
+                            http_senderror(d, 408, "Server timeout waiting for the HTTP request from the client.");
+                        } else {
+                            // no method, no love -- punt!
+                            d->booted = 1;
+                        }
+                    }
+#endif /* NEWHTTPD */
+
                     /* check connidle times for normal and pueblo login */
                     if (!(
 #ifdef NEWHTTPD
@@ -2429,7 +2455,7 @@ shovechars(void)
                             d->type != CT_INBOUND) {
                             d->booted = 1; /* don't drop if running program */
                         }
-                    }
+                    } 
                 }               /* if d->connected... */
             }                   /* for input processing */
             if (cnt > con_players_max) {
@@ -7309,12 +7335,24 @@ module_load(const char *filename, dbref who)
 
 	module_remember(m);
 
+	func = dlsym(m->handle, "__onload");
+
+	if ((error = dlerror()) == NULL)  {	
+        if (!(*func)()) {
+            log_status("MODULE(%s) __onload function failed, automatically unloading.", filename);
+            module_free(mo);
+        }
+    }
+
+
 	return NULL;
 }
 
 void
 module_free(struct module *m)
 {
+	void *(*func)();
+	char *error;
 
 	if (m->progs) {
 		struct mod_proglist *mpr = m->progs;
@@ -7328,6 +7366,14 @@ module_free(struct module *m)
 			mpr = ompr;
 		}
 	}
+
+	func = dlsym(m->handle, "__onunload");
+
+	if ((error = dlerror()) == NULL)  {	
+        if (!(int)(*func)()) {
+            log_status("MODULE_UNLOAD(%s) __onunload function failed.", m->info->name);
+        }
+    }
 
 	if (m->next)
 	   m->next->prev = m->prev;

@@ -108,6 +108,7 @@ struct http_struct {        /* hinoserm */  /***********************************
     int                      flags;         /* Various flags.                   */
     int                      pid;           /* HTMuf pid.                       */
     dbref                    rootobj;       /* The root object dbref number.    */
+    int                      close;         /* Whether the connection is closing*/
 };                          /* hinoserm */  /************************************/
 
 #endif /* NEWHTTPD */
@@ -226,6 +227,7 @@ struct descriptor_data {
 #define DF_MISC       0x8000 /* You can play with this */
 #define DF_IPV6      0x10000 /* Achievement Unlocked: Bleeding Edge - You are connected using IPv6! */
 #define DF_256COLOR  0x20000 /* This descriptor is accepting 256 color */
+#define DF_POLLING   0x80000 /* Makes HTMUF immune to HTTP server timeouts */
 
 #define DR_FLAGS(x,y)         ((descrdata_by_descr(x))->flags & y)
 #define DR_CON_FLAGS(x,y)     ((descrdata_by_index(x))->flags & y)
