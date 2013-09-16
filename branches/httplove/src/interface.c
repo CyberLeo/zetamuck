@@ -858,6 +858,12 @@ main(int argc, char **argv)
         }
     }
 
+#ifdef USE_PS
+    /* Free the environ we malloc'd earlier so that we don't get dinged while
+     * profiling memory leaks. -davin */
+    free(environ);
+#endif /* USE_PS */
+
     exit(0);
 
     return (0);
@@ -5262,7 +5268,7 @@ dump_users(struct descriptor_data *d, char *user)
                 if (dlist->connected && OkObj(dlist->player) && wizwho) {
                     strcpy(buf, "");
                     strcpy(tbuf2, "");
-                    strcpy(buf, unparse_flags(dlist->player, buf));
+                    strcpy(buf, unparse_flags(dlist->player, buf)); // valgrind: Source and destination overlap in strcpy(0xbe7ffef0, 0xbe7ffef0)
                     sprintf(tbuf2, "(%s)", buf);
                     strcat(plyrbuf, tbuf2);
                 }
