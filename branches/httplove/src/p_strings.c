@@ -3202,15 +3202,22 @@ prim_notify_descriptor_nocr(PRIM_PROTOTYPE)
         abort_interp("Non-string argument (2)");
     if (oper2->type != PROG_INTEGER)
         abort_interp("Descriptor integer expected. (1)");
+    /* Silently failing on a bad descriptor is undesirable, so I'm guessing this
+     * was either for debugging purposes or to facilitate a specific purpose
+     * in the test module. Either way, I'm commenting it for now. -davin */
     if (!pdescrp(oper2->data.number)) {
+        /*  
         CLEAR(oper1);
         CLEAR(oper2);
         return;
+        */
+        abort_interp("Invalid descriptor. (1)");
     }
+
     if (oper1->data.string) {
         strcpy(buf, oper1->data.string->data);
+        // why +1? looks like an off-by-one inside of the debugger. -davin
         //notify_descriptor_raw(oper2->data.number, buf, strlen(buf)+1);
-        // why +1?
         notify_descriptor_raw(oper2->data.number, buf, strlen(buf));
     }
     CLEAR(oper1);
