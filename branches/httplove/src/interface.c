@@ -858,11 +858,13 @@ main(int argc, char **argv)
         }
     }
 
-#ifdef USE_PS
+#if defined(USE_PS) && defined(PS_USE_CLOBBER_ARGV)
     /* Free the environ we malloc'd earlier so that we don't get dinged while
      * profiling memory leaks. -davin */
+    for (i = 0; environ[i] != NULL; i++)
+        free(environ[i]);
     free(environ);
-#endif /* USE_PS */
+#endif
 
     exit(0);
 
@@ -5267,8 +5269,9 @@ dump_users(struct descriptor_data *d, char *user)
             if (wizwho) {
                 if (dlist->connected && OkObj(dlist->player) && wizwho) {
                     strcpy(buf, "");
+                    strcpy(tbuf2, unparse_flags(dlist->player, buf));
+                    strcpy(buf, tbuf2);
                     strcpy(tbuf2, "");
-                    strcpy(buf, unparse_flags(dlist->player, buf)); // valgrind: Source and destination overlap in strcpy(0xbe7ffef0, 0xbe7ffef0)
                     sprintf(tbuf2, "(%s)", buf);
                     strcat(plyrbuf, tbuf2);
                 }

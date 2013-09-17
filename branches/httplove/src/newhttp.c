@@ -583,7 +583,9 @@ http_formarray(const char *data)
                 CLEAR(&temp1);
 
                 http_log(NULL, 6, "LINE:    '%s' (%d)\n", q, strlen(q));
-                strcpy(q, s); // valgrind: Source and destination overlap in strcpy(0x4661aab, 0x4661aab)
+                if (q != s) {
+                    strcpy(q, s);
+                }
             } while (*q);
 
             array_set_strkey_arrval(&nw, buf, nw2);

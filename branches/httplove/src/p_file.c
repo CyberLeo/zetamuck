@@ -32,7 +32,7 @@ int getgid(void) { return 0; }
 char *
 set_directory(char *filename)
 {
-    char tempbuf[BUFFER_LEN] = FILE_PRIMS_DIRECTORY;
+    static char tempbuf[BUFFER_LEN] = FILE_PRIMS_DIRECTORY;
 
     strcat(tempbuf, filename);
     filename = tempbuf;
