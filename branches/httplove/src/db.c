@@ -119,6 +119,8 @@ db_grow(dbref newtop)
                 fprintf(stderr, "PANIC: Unable to allocate new object.\n");
                 abort();
             }
+            // uninit check: temporarily init the name of #0 to NULL -davin
+            db[0].name = NULL;
         }
         /* maybe grow it */
         if (db_top > db_size) {

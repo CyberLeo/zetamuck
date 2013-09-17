@@ -115,6 +115,8 @@ typedef char bool;      /* for eventual C++ convert */
 #define DB_WRITELOCK(x)
 #define DB_RELEASE(x)
 
+#define DB_LOADED()  (db[0].name ? 1 : 0)
+
 #ifdef GDBM_DATABASE
 #  define DBFETCH(x)  dbfetch(x)
 #  define DBDIRTY(x)  dbdirty(x)

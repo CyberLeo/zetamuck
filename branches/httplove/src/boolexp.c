@@ -310,7 +310,7 @@ parse_boolexp_F(int descr, const char **parsebuf, dbref player, int dbloadp)
                 }
                 b->thing = (dbref) atoi(buf + 1);
                 if (b->thing < 0 || b->thing >= db_top // valgrind: Conditional jump or move depends on uninitialised value(s)
-                    || Typeof(b->thing) == TYPE_GARBAGE) { 
+                    || (DB_LOADED() && Typeof(b->thing) == TYPE_GARBAGE)) { 
                     free_boolnode(b);
                     return TRUE_BOOLEXP;
                 } else {
