@@ -204,7 +204,7 @@ array_to_json(stk_array *arr, dbref player) {
                                 jitem = json_object();
                                 break;
                             default:
-                                return NULL;
+                                assert(0); // kaboom
                         }
                         qtail->nxt = (json_queue *) malloc(sizeof(json_queue));
                         qtail->nxt->jnode = jitem;
