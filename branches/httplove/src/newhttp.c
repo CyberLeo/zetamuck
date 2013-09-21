@@ -607,6 +607,7 @@ http_makearray(struct descriptor_data *d)
     char buf[BUFFER_LEN];
 #ifdef JSON_SUPPORT
     stk_array *jsonerr;
+    char *jencoded;
 #endif
 
     sprintf(buf, "/%s", d->http->newdest);
@@ -655,13 +656,20 @@ http_makearray(struct descriptor_data *d)
                 array_set_strkey_strval(&nw3, f->field, f->data);
                 CLEAR(&temp1);
 #ifdef JSON_SUPPORT
-                if (!string_compare(d->http->method, "POST") &&
-                        !string_compare(f->field, "Content-Type") &&
+                /* note: since we're not setting JSON_REJECT_DUPLICATES, the
+                 *       last participant in a key collision will win. */
+                if (!string_compare(f->field, "Content-Type") &&
                         string_prefix(f->data, "application/json")) {
-                    /* note: since we're not setting JSON_REJECT_DUPLICATES, the
-                     *       last participant in a key collision will win. */
-                    array_set_strkey_arrval(&nw, "JSON", jdecode_array(d->http->body.data, 0, &jsonerr));
-                    array_set_strkey_arrval(&nw, "JSONError", jsonerr);
+                    if (!string_compare(d->http->method, "GET")) {
+                        jencoded = strdup(d->http->cgidata);
+                        unescape_url(jencoded);
+                        array_set_strkey_arrval(&nw, "JSON", jdecode_array(jencoded, 0, &jsonerr));
+                        array_set_strkey_arrval(&nw, "JSONError", jsonerr);
+                        FREE(jencoded);
+                    } else if (!string_compare(d->http->method, "POST")) {
+                        array_set_strkey_arrval(&nw, "JSON", jdecode_array(d->http->body.data, 0, &jsonerr));
+                        array_set_strkey_arrval(&nw, "JSONError", jsonerr);
+                    }
                 }
 #endif
             }
@@ -670,9 +678,6 @@ http_makearray(struct descriptor_data *d)
         array_set_strkey_arrval(&nw, "HeaderFields", nw2);
         array_set_strkey_arrval(&nw, "HeaderData", nw3);
     }
-#ifdef JSON_SUPPORT
-
-#endif
 
     return nw;
 }

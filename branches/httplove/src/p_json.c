@@ -48,8 +48,11 @@ prim_array_jencode(PRIM_PROTOTYPE) {
     
     CLEAR(oper1);
     CLEAR(oper2);
-    
-    PushString(jsontext);
+   
+    if (jsontext) { 
+        PushString(jsontext);
+        free(jsontext);
+    }
 }
 
 void
