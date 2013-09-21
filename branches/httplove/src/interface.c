@@ -856,13 +856,6 @@ main(int argc, char **argv)
             }
             execl("restart", "restart", portlist, (char *) 0);
         }
-#if defined(USE_PS) && defined(PS_CLOBBER_ARGV)
-        /* Free the environ we malloc'd earlier so that we don't get dinged while
-         * profiling memory leaks. -davin */
-        for (i = 0; environ[i] != NULL; i++)
-            free(environ[i]);
-        free(environ);
-#endif
     }
 
 
