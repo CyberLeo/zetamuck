@@ -56,6 +56,9 @@ extern void prim_array_filter_flags(PRIM_PROTOTYPE);
 extern void prim_array_sum(PRIM_PROTOTYPE);
 extern void prim_array_string_fragment(PRIM_PROTOTYPE);
 
+extern void prim_array_pin(PRIM_PROTOTYPE);
+extern void prim_array_unpin(PRIM_PROTOTYPE);
+
 #define PRIMS_ARRAY_FUNCS prim_array_make, prim_array_make_dict,              \
         prim_array_explode, prim_array_vals, prim_array_keys,                 \
         prim_array_first, prim_array_last, prim_array_next, prim_array_prev,  \
@@ -73,8 +76,8 @@ extern void prim_array_string_fragment(PRIM_PROTOTYPE);
         prim_array_matchkey, prim_array_matchval, prim_array_extract,         \
         prim_array_cut, prim_array_compare, prim_array_sort_indexed,          \
         prim_array_interpret, prim_array_filter_flags, prim_array_nested_get, \
-	prim_array_nested_set, prim_array_nested_del, prim_array_sum,         \
-        prim_array_string_fragment
+        prim_array_nested_set, prim_array_nested_del, prim_array_sum,         \
+        prim_array_string_fragment, prim_array_pin, prim_array_unpin
 
 #define PRIMS_ARRAY_NAMES "ARRAY_MAKE", "ARRAY_MAKE_DICT",        \
         "ARRAY_EXPLODE", "ARRAY_VALS", "ARRAY_KEYS",              \
@@ -93,7 +96,8 @@ extern void prim_array_string_fragment(PRIM_PROTOTYPE);
         "ARRAY_MATCHKEY", "ARRAY_MATCHVAL", "ARRAY_EXTRACT",      \
         "ARRAY_CUT", "ARRAY_COMPARE", "ARRAY_SORT_INDEXED",       \
         "ARRAY_INTERPRET", "ARRAY_FILTER_FLAGS",                  \
-	"ARRAY_NESTED_GET", "ARRAY_NESTED_SET",                   \
-	"ARRAY_NESTED_DEL", "ARRAY_SUM", "ARRAY_STRING_FRAGMENT"
+        "ARRAY_NESTED_GET", "ARRAY_NESTED_SET",                   \
+        "ARRAY_NESTED_DEL", "ARRAY_SUM", "ARRAY_STRING_FRAGMENT", \
+        "ARRAY_PIN", "ARRAY_UNPIN"
 
-#define PRIMS_ARRAY_CNT 51
+#define PRIMS_ARRAY_CNT 53

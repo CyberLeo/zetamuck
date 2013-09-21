@@ -660,6 +660,16 @@ prim_sqlp(PRIM_PROTOTYPE)
 }
 
 void
+prim_pinnedp(PRIM_PROTOTYPE)
+{
+    CHECKOP(1);
+    oper1 = POP();
+    result = (oper1->type == PROG_ARRAY && oper1->data.array->pinned);
+    CLEAR(oper1);
+    PushInt(result);
+}
+
+void
 prim_markp(PRIM_PROTOTYPE)
 {
     CHECKOP(1);

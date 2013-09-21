@@ -570,6 +570,7 @@ new_array(void)
     new2->items = 0;
     new2->type = ARRAY_UNDEFINED;
     new2->data.packed = NULL;
+    new2->pinned = 0;
 
     return new2;
 }
@@ -621,6 +622,7 @@ array_decouple(stk_array *arr)
     }
 
     new2 = new_array();
+    new2->pinned = arr->pinned;
     new2->type = arr->type;
     switch (arr->type) {
         case ARRAY_PACKED:{
@@ -1025,7 +1027,7 @@ array_setitem(stk_array **harr, array_iter *idx, array_data *item)
                 return -4;
             }
             if (idx->data.number >= 0 && idx->data.number < arr->items) {
-                if (arr->links > 1) {
+                if (arr->links > 1 && !arr->pinned) {
                     arr->links--;
                     arr = *harr = array_decouple(arr);
                 }
@@ -1033,7 +1035,7 @@ array_setitem(stk_array **harr, array_iter *idx, array_data *item)
                 copyinst(item, &arr->data.packed[idx->data.number]);
                 return arr->items;
             } else if (idx->data.number == arr->items) {
-                if (arr->links > 1) {
+                if (arr->links > 1 && !arr->pinned) {
                     arr->links--;
                     arr = *harr = array_decouple(arr);
                 }
@@ -1093,7 +1095,7 @@ array_insertitem(stk_array **harr, array_iter *idx, array_data *item)
             if (idx->data.number < 0 || idx->data.number > arr->items) {
                 return -1;
             }
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1112,7 +1114,7 @@ array_insertitem(stk_array **harr, array_iter *idx, array_data *item)
         case ARRAY_DICTIONARY:{
             array_tree *p;
 
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1268,7 +1270,7 @@ array_setrange(stk_array **harr, array_iter *start, stk_array *inarr)
             if (start->data.number < 0 || start->data.number > arr->items) {
                 return -1;
             }
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1283,7 +1285,7 @@ array_setrange(stk_array **harr, array_iter *start, stk_array *inarr)
         }
 
         case ARRAY_DICTIONARY:{
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1329,7 +1331,7 @@ array_insertrange(stk_array **harr, array_iter *start, stk_array *inarr)
             if (start->data.number < 0 || start->data.number > arr->items) {
                 return -1;
             }
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1360,7 +1362,7 @@ array_insertrange(stk_array **harr, array_iter *start, stk_array *inarr)
         }
 
         case ARRAY_DICTIONARY:{
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1420,7 +1422,7 @@ array_delrange(stk_array **harr, array_iter *start, array_iter *end)
             if (sidx > eidx) {
                 return -1;
             }
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1466,7 +1468,7 @@ array_delrange(stk_array **harr, array_iter *start, array_iter *end)
             if (array_tree_compare(&s->key, &e->key, 0, 0, 0) > 0) {
                 return arr->items;
             }
-            if (arr->links > 1) {
+            if (arr->links > 1 && !arr->pinned) {
                 arr->links--;
                 arr = *harr = array_decouple(arr);
             }
@@ -1756,3 +1758,15 @@ array_appendref(stk_array **arr, dbref theref)
 
     return (i);
 }
+
+void
+array_set_pinned(stk_array* arr, int pinned)
+{
+        /* Since this is a no-op if it's not actually an array,
+         * should it ever be called with a NULL arr? */
+        assert(arr != NULL);
+        if (arr != NULL) {
+                arr->pinned = pinned;
+        }
+}
+

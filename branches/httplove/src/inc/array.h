@@ -22,6 +22,7 @@ typedef struct stk_array_t {
 	int links;       /* number of pointers  to array */
 	int items;                  /* number of items in array */
 	short type;                 /* type of array */
+    int pinned;                 /*  if pinned, don't dup array on changes */
 	union {
 		array_data *packed;     /* pointer to packed array */
 		array_tree *dict;       /* pointer to dictionary AVL tree */
@@ -75,6 +76,9 @@ int array_set_intkey_strval(stk_array ** harr, int key, const char *val);
 const char* array_get_intkey_strval(stk_array * arr, int key); 
 
 int array_appendref(stk_array **arr, dbref ref);
+
+stk_array *array_decouple(stk_array * arr);
+void array_set_pinned(stk_array * arr, int pinned);
 
 #endif       						/* MUFARRAY_H */
 

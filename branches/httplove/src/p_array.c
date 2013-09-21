@@ -1446,8 +1446,12 @@ prim_array_put_propvals(PRIM_PROTOTYPE)
                     pdat.flags = PROP_LOKTYP;
                     pdat.data.lok = copy_bool(oper4->data.lock);
                     break;
+                default:
+                    *propname = '\0';
             }
-            set_property(ref, propname, &pdat);
+            if (*propname) {
+                set_property(ref, propname, &pdat);
+            }
         } while (array_next(arr, &temp1));
     }
 
@@ -2623,4 +2627,49 @@ prim_array_string_fragment(PRIM_PROTOTYPE)
     PushArrayRaw(nu);
 }      
         
+void
+prim_array_pin(PRIM_PROTOTYPE)
+{
+        stk_array *arr;
+        stk_array *nu;
+
+        CHECKOP(1);
+        oper1 = POP();                          /* arr  Array */
+        if (oper1->type != PROG_ARRAY)
+                abort_interp("Argument not an array.");
+
+        arr = oper1->data.array;
+        if (!arr) {
+                nu = new_array_packed(0);
+        } else if (arr->links > 1) {
+                nu = array_decouple(arr);
+        } else {
+                arr->links++;
+                nu = arr;
+        }
+        array_set_pinned(nu, 1);
+
+        CLEAR(oper1);
+        PushArrayRaw(nu);
+}
+
+void
+prim_array_unpin(PRIM_PROTOTYPE)
+{
+        stk_array *arr;
+
+        CHECKOP(1);
+        oper1 = POP();                          /* arr  Array */
+        if (oper1->type != PROG_ARRAY)
+                abort_interp("Argument not an array.");
+
+        arr = oper1->data.array;
+        if (arr) {
+                arr->links++;
+                array_set_pinned(arr, 0);
+        }
+
+        CLEAR(oper1);
+        PushArrayRaw(arr);
+}
 
