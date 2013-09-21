@@ -1433,6 +1433,10 @@ array_delrange(stk_array **harr, array_iter *start, array_iter *end)
             idx.data.number += 1;
             while (idx.data.number < arr->items) {
                 itm = array_getitem(arr, &idx);
+                // plug memory leak -davin
+                if (arr->data.packed[didx.data.number].type != PROG_CLEARED ) {
+                    CLEAR(&arr->data.packed[didx.data.number]);
+                }
                 copyinst(itm, &arr->data.packed[didx.data.number]);
                 CLEAR(itm);
                 idx.data.number++;
