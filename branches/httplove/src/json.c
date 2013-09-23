@@ -204,7 +204,7 @@ array_to_json(stk_array *arr, dbref player) {
                                 jitem = json_object();
                                 break;
                             default:
-                                assert(0); // kaboom
+                                assert(!"arr->type is invalid.");
                         }
                         qtail->nxt = (json_queue *) malloc(sizeof(json_queue));
                         qtail->nxt->jnode = jitem;
@@ -276,7 +276,10 @@ array_to_json(stk_array *arr, dbref player) {
                             jitem = json_string(buf);
                             json_object_set_new(lckdict, buf + sizeof(JSON_PREFIX_LOCK - 1), jitem);
                         }
+                    case (PROG_CLEARED):
                     default:
+                        assert(arritem->type > 0 && arritem->type < 255 &&
+                                "Stack item must be initialized.");
                         /* TODO: return a text representation */
                         jitem = unsupported;
                 }
@@ -632,7 +635,7 @@ json_to_array(json_t *jroot, int minrefs) {
                         break;
                     default:
                         /* should never get here */
-                        return NULL;
+                        assert(!"Unrecognized JSON object type.");
                 }
 
                 /* store the object we just decoded in the array the current

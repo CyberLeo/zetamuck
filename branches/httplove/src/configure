@@ -655,7 +655,6 @@ with_ssl
 with_jansson
 with_mysql
 with_modules
-enable_asroot
 enable_reslvd
 enable_compress
 enable_ipv6
@@ -1282,15 +1281,14 @@ Optional Features:
   --disable-option-checking  ignore unrecognized --enable/--with options
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
-  --enable-asroot         allow file primitives under root user
   --enable-reslvd         enable shared resolver support (reslvd)
   --disable-compress      disable database compression
   --enable-ipv6           enable ipv6
   --enable-gprof          compile with gprof profiling enabled
   --enable-debug=number   Compile with extended debugging enabled. This is the
-                          same as setting -g(number) in CFLAGS. The keyword "all"
-                          is the same as "--enable-debug=3 --enable-gprof" and
-                          disables compiler optimizations. (CFLAGS=-O0)
+                          same as setting -g(number) in CFLAGS. The keyword "full"
+                          is the same as "--enable-debug=3" and disables compiler
+                          optimizations. (CFLAGS=-g3 -O0)
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4377,19 +4375,6 @@ LIBS="-rdynamic $LIBS"
 fi
 
 
-
-# Check whether --enable-asroot was given.
-if test "${enable_asroot+set}" = set; then :
-  enableval=$enable_asroot;
-if test "$enableval" != "no"; then
-
-$as_echo "#define PROTO_AS_ROOT /**/" >>confdefs.h
-
-fi
-
-fi
-
-
 # Check whether --enable-reslvd was given.
 if test "${enable_reslvd+set}" = set; then :
   enableval=$enable_reslvd;
@@ -4441,13 +4426,13 @@ if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug;
     if test "$enableval" = "no"; then
         DEBUG_FLAGS+=""
-    elif test "$enableval" = "all"; then
-        DEBUG_FLAGS="-g3 -pg -O0"
+    elif test "$enableval" = "full"; then
+        DEBUG_FLAGS="-g3 -O0"
     elif test "$enableval" != "yes"; then
         # TODO: Make sure it's a number.
-        DEBUG_FLAGS+=" -g${enableval}"
+        DEBUG_FLAGS+="-g${enableval}"
     else
-        DEBUG_FLAGS+=" -g"
+        DEBUG_FLAGS+="-g"
     fi
 
 

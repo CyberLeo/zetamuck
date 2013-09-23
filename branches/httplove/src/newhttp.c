@@ -665,7 +665,7 @@ http_makearray(struct descriptor_data *d)
                         unescape_url(jencoded);
                         array_set_strkey_arrval(&nw, "JSON", jdecode_array(jencoded, 0, &jsonerr));
                         array_set_strkey_arrval(&nw, "JSONError", jsonerr);
-                        FREE(jencoded);
+                        free(jencoded);
                     } else if (!string_compare(d->http->method, "POST")) {
                         array_set_strkey_arrval(&nw, "JSON", jdecode_array(d->http->body.data, 0, &jsonerr));
                         array_set_strkey_arrval(&nw, "JSONError", jsonerr);

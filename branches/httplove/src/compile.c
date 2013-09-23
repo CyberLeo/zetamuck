@@ -2250,6 +2250,14 @@ do_directive(COMPSTATE *cstat, char *direct)
             cstat->next_char++; /* What does this accomplish ??? */
         add_property(cstat->program, "_Note", tmpname, 0);
         advance_line(cstat);
+    } else if (!string_compare(temp, "wwwtype")) {
+        while (*cstat->next_char && isspace(*cstat->next_char))
+            cstat->next_char++; /* eating leading spaces */
+        tmpname = (char *) cstat->next_char;
+        while (*cstat->next_char)
+            cstat->next_char++; /* What does this accomplish ??? */
+        add_property(cstat->program, "_type", tmpname, 0);
+        advance_line(cstat);
     } else if (!string_compare(temp, "ifcancall")
                || !string_compare(temp, "ifncancall")) {
         struct match_data md;
@@ -2601,6 +2609,59 @@ do_directive(COMPSTATE *cstat, char *direct)
                     }
                 } else {
                     sprintf(propname, "/_Defs/%s", tmpname);
+                }
+
+                if (doitset) {
+                    if (defstr && *defstr) {
+                        add_property(cstat->program, propname, defstr, 0);
+                    } else {
+                        remove_property(cstat->program, propname);
+                    }
+                }
+            }
+
+        }
+        while (*cstat->next_char)
+            cstat->next_char++;
+        advance_line(cstat);
+        free(holder);
+
+    } else if (!string_compare(temp, "propdoc")) {
+        char *holder = NULL;
+
+        tmpname = (char *) next_token_raw(cstat);
+        holder = tmpname;
+        if (!tmpname)
+            abort_compile(cstat,
+                          "Unexpected end of file looking for $propdoc name.");
+        if (string_compare(tmpname, ":") && index(tmpname, ':')) {
+            free(tmpname);
+            abort_compile(cstat,
+                          "Invalid $propdoc name.  The : character is illegal.");
+        } else {
+            if (!string_compare(tmpname, ":")) {
+                remove_property(cstat->program, "/_propdoc/");
+            } else {
+                const char *defstr = NULL;
+                char propname[BUFFER_LEN];
+                int doitset = 1;
+
+                while (*cstat->next_char && isspace(*cstat->next_char))
+                    cstat->next_char++; /* eating leading spaces */
+                defstr = cstat->next_char;
+
+                if (*tmpname == '\\') {
+                    char *temppropstr = NULL;
+
+                    (void) *tmpname++;
+                    sprintf(propname, "/_propdoc/%s", tmpname);
+                    temppropstr =
+                        (char *) get_property_class(cstat->program, propname);
+                    if (temppropstr) {
+                        doitset = 0;
+                    }
+                } else {
+                    sprintf(propname, "/_propdoc/%s", tmpname);
                 }
 
                 if (doitset) {

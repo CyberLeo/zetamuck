@@ -282,15 +282,6 @@ AC_DEFINE(MODULAR_SUPPORT, [], [Defined to enable modular support])
 LIBS="-rdynamic $LIBS"
 ])
 
-
-AC_ARG_ENABLE(asroot,
-[  --enable-asroot         allow file primitives under root user],
-[
-if test "$enableval" != "no"; then
-    AC_DEFINE(PROTO_AS_ROOT, [], [DANGEROUS: Defined to allow file prims and webserver to run as root])
-fi
-])
-
 AC_ARG_ENABLE(reslvd,
 [  --enable-reslvd         enable shared resolver support (reslvd)],
 [
@@ -325,19 +316,19 @@ fi
 
 AC_ARG_ENABLE(debug,
 [  --enable-debug[=number]   Compile with extended debugging enabled. This is the
-                          same as setting -g(number) in CFLAGS. The keyword "all"
-                          is the same as "--enable-debug=3 --enable-gprof" and
-                          disables compiler optimizations. (CFLAGS=-O0) ],
+                          same as setting -g(number) in CFLAGS. The keyword "full"
+                          is the same as "--enable-debug=3" and disables compiler
+                          optimizations. (CFLAGS=-g3 -O0) ],
 [
     if test "$enableval" = "no"; then
         DEBUG_FLAGS+=""
-    elif test "$enableval" = "all"; then
-        DEBUG_FLAGS="-g3 -pg -O0"
+    elif test "$enableval" = "full"; then
+        DEBUG_FLAGS="-g3 -O0"
     elif test "$enableval" != "yes"; then
         # TODO: Make sure it's a number.
-        DEBUG_FLAGS+=" -g${enableval}"
+        DEBUG_FLAGS+="-g${enableval}"
     else
-        DEBUG_FLAGS+=" -g"
+        DEBUG_FLAGS+="-g"
     fi
 
 ],
