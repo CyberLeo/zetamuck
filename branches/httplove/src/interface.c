@@ -1979,6 +1979,10 @@ shovechars(void)
                         process_output(d); /* send QUIT related notifies */
 #ifdef NEWHTTPD
                     }
+                    if (d->type == CT_HTTP && d->booted != 4) {
+                        // d->booted is about to be reset, so this must be set now.
+                        d->http->close = 1;
+                    } 
 #endif /* NEWHTTPD */
                     d->booted = 0;
 #ifdef NEWHTTPD

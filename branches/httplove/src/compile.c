@@ -815,8 +815,9 @@ include_internal_defs(COMPSTATE *cstat)
     insert_def(cstat, "JSON_REJECT_DUPLICATES", buf);
     /* we'll allow JSON_DISABLE_EOF_CHECKS, but it's up to the user to figure
        out how to not blow the post-EOF data away on overwrite */
-    sprintf(buf, "%d", JSON_SORT_KEYS);
+    sprintf(buf, "%d", JSON_DISABLE_EOF_CHECK);
     insert_def(cstat, "JSON_DISABLE_EOF_CHECK", buf);
+    /* do not implement JSON_DECODE_ANY */
 #endif
 
 }
@@ -2634,46 +2635,40 @@ do_directive(COMPSTATE *cstat, char *direct)
         if (!tmpname)
             abort_compile(cstat,
                           "Unexpected end of file looking for $propdoc name.");
-        if (string_compare(tmpname, ":") && index(tmpname, ':')) {
-            free(tmpname);
-            abort_compile(cstat,
-                          "Invalid $propdoc name.  The : character is illegal.");
+        if (!string_compare(tmpname, ":")) {
+            remove_property(cstat->program, "/_propdoc/");
         } else {
-            if (!string_compare(tmpname, ":")) {
-                remove_property(cstat->program, "/_propdoc/");
+            const char *defstr = NULL;
+            char propname[BUFFER_LEN];
+            int doitset = 1;
+
+            while (*cstat->next_char && isspace(*cstat->next_char))
+                cstat->next_char++; /* eating leading spaces */
+            defstr = cstat->next_char;
+
+            if (*tmpname == '\\') {
+                char *temppropstr = NULL;
+
+                (void) *tmpname++;
+                sprintf(propname, "/_propdoc/%s", tmpname);
+                temppropstr =
+                    (char *) get_property_class(cstat->program, propname);
+                if (temppropstr) {
+                    doitset = 0;
+                }
             } else {
-                const char *defstr = NULL;
-                char propname[BUFFER_LEN];
-                int doitset = 1;
-
-                while (*cstat->next_char && isspace(*cstat->next_char))
-                    cstat->next_char++; /* eating leading spaces */
-                defstr = cstat->next_char;
-
-                if (*tmpname == '\\') {
-                    char *temppropstr = NULL;
-
-                    (void) *tmpname++;
-                    sprintf(propname, "/_propdoc/%s", tmpname);
-                    temppropstr =
-                        (char *) get_property_class(cstat->program, propname);
-                    if (temppropstr) {
-                        doitset = 0;
-                    }
-                } else {
-                    sprintf(propname, "/_propdoc/%s", tmpname);
-                }
-
-                if (doitset) {
-                    if (defstr && *defstr) {
-                        add_property(cstat->program, propname, defstr, 0);
-                    } else {
-                        remove_property(cstat->program, propname);
-                    }
-                }
+                sprintf(propname, "/_propdoc/%s", tmpname);
             }
 
+            if (doitset) {
+                if (defstr && *defstr) {
+                    add_property(cstat->program, propname, defstr, 0);
+                } else {
+                    remove_property(cstat->program, propname);
+                }
+            }
         }
+
         while (*cstat->next_char)
             cstat->next_char++;
         advance_line(cstat);
