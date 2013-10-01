@@ -157,9 +157,9 @@ prim_jencode_file(PRIM_PROTOTYPE)
     int flags, success;
 
     CHECKOP(3);
-    oper1 = POP();  /* arr: array to encode */ 
+    oper1 = POP();  /* int: JSON decoding options */ 
     oper2 = POP();  /* str: path to file */ 
-    oper3 = POP();  /* int: JSON decoding options */ 
+    oper3 = POP();  /* arr: array to encode */ 
 
 
 #ifndef PROTO_AS_ROOT
