@@ -3768,6 +3768,13 @@ $cleardefs [ALL]
     Ignores program _defs/ when compiling the program. Wizards can use
     $cleardefs ALL to also ignore #0 _defs/ when compiling. This does
     not affect macros, and internal _defs/ are always loaded no matter what.
+ 
+$propdoc
+    Like $pubdef, but defines values in the _propdoc/ directory on a MUF
+    program. Allows the / character, unlike $pubdef. Used for defining
+    documentation of props used by the program in a way that can be searched
+    from outside of the program. Use : by itself to clear the contents of the
+    propdir prior to writing out entries.
 
 See 'man dir7' for more directives and 'man dir list' for a listing.
 ~~~~~
@@ -3793,6 +3800,7 @@ Some special defines that can be checked via $ifdef:
     HAVE_MUF_EDIT_PRIMS - If $ifdef'd, means the MUF editing prims are compiled.
     HAVE_PCRE           - If $ifdef'd, means the regexp prims are compiled in.
     HAVE_IGNORES        - If $ifdef'd, means the ignore prims are compiled in.
+    HAVE_JSON           - If $ifdef'd, means the JSON prims are compiled in.
 
 See 'man dir8' for more information on directives.
 
@@ -3813,7 +3821,7 @@ DIR LIST|DIRLIST|ALL DIRECTIVES|DIRS
  
 Working with props:
 $alpha      $pubdef    $note      $lib-version
-$beta       $author    $version
+$beta       $author    $version   $propdoc
 
 Working with macros and definitions:
 $define     $enddef    $def       $undef
@@ -11623,4 +11631,190 @@ FILTER_SMATCH
 
 FILTER_CASELESS
   Match strings with caseless checks
+~~~
+ARRAY_PIN
+ 
+array_pin ( a -- a' )
+ 
+Returns a "pinned" version of the input array. Members of a pinned array are
+persistent across all instances of that array until the array is unpinned.
+Modifying the output of ARRAY_PIN (a') will *not* change data associated with
+existing copies of the input array (a).
+ 
+In plain English, if you dup a pinned array and then modify it, the same changes
+happen to the original array. Both stack items are the same array in memory.
+This is a useful optimization when you're appending to (or overwriting members
+of) a very large data sets, such as those associated with files and sockets.
+ 
+WARNING:
+Interactions with pinned arrays violate the expectations of most programmers.
+It's recommended that you use them sparingly, and *never* return them to the
+stack when your programs are called. To keep your programs legible, it's also
+advised that you use discrete variable naming to denote pinned array data.
+(i.e. MyPinnedVar_, with the trailing "_" in the name denoting pinned data)
+ 
+See: ARRAY_UNPIN, PINNED?
+~~~
+ARRAY_UNPIN
 
+array_unpin ( a -- a )
+
+Unpins the input array, and all existing instances of it. Returns the input
+array back to the stack.
+ 
+See: ARRAY_PIN, PINNED?
+~~~
+PINNED?
+ 
+pinned? ( a -- i )
+ 
+Given an input array, returns true of the array is pinned.
+ 
+See: ARRAY_PIN, ARRAY_UNPIN
+~~~
+HTTPSENDHEADER
+ 
+httpsendheader ( i1 i2 s i3 i4 i5 -- )
+i1: descriptor
+i2: HTTP status code
+ s: MIME type
+i3: content length
+i4: auto-terminate headers if true
+i5: shut down connection after this request if true
+ 
+The game does not automatically send headers to a connected HTTP client when the
+"_type" prop on a program is set to "noheader". This primitive is used for
+generating those headers without having to build them manually.
+
+The full list of headers sent:
+ 
+HTTP status line (i2)
+Date
+Server
+Content-Type (s) (defaults to "text/plain" on empty string)
+Content-Length (i3)
+Content-Encoding
+Connection (only if i5 is true; sends "close;")
+ 
+If i4 is true, a CRLF will be sent to end the headers. This completes the HTTP
+transaction if i3 is zero; otherwise the client will still expect you to send
+i3 bytes with of payload. If i4 is false, you will need to send your own CRLF
+once you're done transmitting custom headers.
+ 
+If i5 is true, the connection will be shut down when this transaction completes,
+and a "Connection: close;" header will be sent to advise such. Sending false
+does not necessarily mean the connection will stay open.
+~~~
+ARRAY_JENCODE
+
+array_jencode ( a i -- s )
+------------------------
+a - any array
+i - JSON encoding flags (man JSON FLAGS)
+s - Serialized string (JSON)
+
+Takes an input array and serializes it to a string that can be converted back
+into an array later. The output format is RFC-compliant JSON suitable for
+parsing by external applications.
+
+Only prop-safe array items (help @propset) can be serialized. All other stack
+types will be serialized as a string containing an error.
+
+See: JSON PRIMS, JSON FLAGS, ARRAY_JDECODE
+~~~
+ARRAY_JDECODE
+ 
+array_jdecode ( a1 i -- a2 a3 )
+-------------------------------
+a1 - array of strings
+i  - JSON decoding flags (man JSON FLAGS)
+a2 - decoded array (or empty)
+a3 - dictionary containing decoder errors (or empty)
+
+Treat input text a1 as a serialized array, and attempt to decode it into an
+array on the stack (a2). a1 must parse as RFC-compliant JSON. If the parser
+encounters any errors during the decode, a3 will be a dictionary containing
+the errors and a2 will evaluate as false (empty array); otherwise a3 will
+evaluate as false and a2 will be the successfully decoded array.
+
+a2 will be either a list-style array or a dictionary. The type depends on
+the kind of array serialized in the strings.
+ 
+See: JSON PRIMS, JSON FLAGS, JSON ERRORS, ARRAY_JENCODE
+~~~
+JDECODE_FILE
+ 
+jdecode_file ( s i -- a1 a2 )
+-----------------------------
+s  - path to the file to decode
+i  - JSON decoding flags (man JSON FLAGS)
+a1 - decoded array (or empty)
+a2 - dictionary containing decoder errors (or empty)
+
+Decode file s as a text file containing a serialized array, and attempt to
+decode it into an array on the stack (a1). a1 must parse as RFC-compliant JSON.
+If the parser encounters any errors during the decode, a2 will be a dictionary
+containing the errors and a1 will evaluate as false (empty array); otherwise a2
+will evaluate as false and a1 will be the successfully decoded array.
+
+a1 will be either a list-style array or a dictionary. The type depends on
+the kind of array serialized in the file.
+ 
+See: JSON PRIMS, JSON FLAGS, JSON ERRORS, JENCODE_FILE
+~~~
+JENCODE_FILE
+ 
+jencode_file ( a s i1 -- i2 )
+-----------------------------
+a  - any array
+s  - destination file path
+i1 - JSON encoding flags (man JSON FLAGS)
+i2 - success status
+
+Takes an input array and serializes it to destination file s. This file can be
+loaded with jdecode_file and converted back into an array. The output format is
+RFC-compliant JSON suitable for parsing by external applications.
+
+Only prop-safe array items (help @propset) can be serialized. All other stack
+types will be serialized as a string containing an error.
+ 
+See: JSON PRIMS, JSON FLAGS, JDECODE_FILE
+~~~
+JSON FLAGS
+
+Encoding Flags:
+JSON_INDENT4
+  Insert newlines between array items, and indent by 4 spaces.
+JSON_INDENT2
+  Insert newlines between array items, and indent by 4 spaces.
+JSON_COMPACT
+  Eliminate unnecessary whitespace for maximum unreadability.
+JSON_SORT_KEYS
+  Dictionary items are sorted by key. Useful for when comparing files.
+JSON_PRESERVE_ORDER
+  Preserve ordering of dictionaries. Not very useful unless you've called an
+  array sorting primitive first.
+
+Decoding Flags:
+JSON_REJECT_DUPLICATES
+  If this flag is not set, key collisions when decoding a text stream will
+  result in the last participant winning. With this flag set, a key collision
+  will cause the decode to fail.
+JSON_DISABLE_EOF_CHECKS
+  Normally, an error will be generated if extra data is found at the end of the
+  outermost JSON container. With this flag set, the decode will succeed despite
+  this if the JSON syntax is otherwise valid.
+~~~
+JSON ERRORS
+ 
+In the event of a failure to decode JSON, a dictionary will be returned that
+contains additional information about the problem. It will contain these keys:
+ 
+text:
+  An error message associated with the problem.
+line:
+  The line number on which the error occurred.
+column:
+  The column on which the error occurred.
+position:
+  Count in bytes from the start of the input.
