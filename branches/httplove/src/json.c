@@ -255,27 +255,30 @@ array_to_json(stk_array *arr, dbref player) {
                                 jitem = json_true();
                                 break;
                             default:
-                                sprintf(buf, JSON_PREFIX_DBREF "%d",
+                                strcpy(buf, JSON_PREFIX_DBREF);
+                                sprintf(buf + sizeof(JSON_PREFIX_DBREF) - 1, "%d",
                                         arritem->data.objref);
-                                if ((hashref = json_object_get(refdict, buf + sizeof(JSON_PREFIX_DBREF - 1)))) {
+                                if ((hashref = json_object_get(refdict, buf + sizeof(JSON_PREFIX_DBREF) - 1))) {
                                     jitem = hashref;
                                 } else {
                                     jitem = json_string(buf);
-                                    json_object_set_new(refdict, buf + sizeof(JSON_PREFIX_DBREF - 1), jitem);
+                                    json_object_set_new(refdict, buf + sizeof(JSON_PREFIX_DBREF) - 1, jitem);
                                 }
                                 break;
                         }
                         break;
                     case (PROG_LOCK):
                         lckptr = unparse_boolexp(player, arritem->data.lock, 0);
-                        sprintf(buf, JSON_PREFIX_LOCK "%s", lckptr);
+                        strcpy(buf, JSON_PREFIX_LOCK);
+                        sprintf(buf + sizeof(JSON_PREFIX_LOCK) - 1, "%s", lckptr);
 
-                        if ((hashref = json_object_get(lckdict, buf + sizeof(JSON_PREFIX_LOCK - 1)))) {
+                        if ((hashref = json_object_get(lckdict, buf + sizeof(JSON_PREFIX_LOCK) - 1))) {
                             jitem = hashref;
                         } else {
                             jitem = json_string(buf);
-                            json_object_set_new(lckdict, buf + sizeof(JSON_PREFIX_LOCK - 1), jitem);
+                            json_object_set_new(lckdict, buf + sizeof(JSON_PREFIX_LOCK) - 1, jitem);
                         }
+                        break;
                     case (PROG_CLEARED):
                     default:
                         assert(arritem->type > 0 && arritem->type < 255 &&
