@@ -1721,7 +1721,7 @@ idleboot_user(struct descriptor_data *d)
     queue_write(d, "\r\n", 2);
     queue_write(d, tp_idleboot_msg, strlen(tp_idleboot_msg));
     queue_write(d, "\r\n\r\n", 4);
-    d->booted = 1;
+    d->booted = BOOT_DROP;
 }
 
 static int con_players_max = 0; /* one of Cynbe's good ideas. */
@@ -1781,10 +1781,10 @@ void *threaded_output_handler(void *ptr)
                 dnext = d->next;
                 if (FD_ISSET(d->descriptor, &output_set)) {
                     if (!process_output(d)) /* send text */
-                        d->booted = 1; /* connection lost */
+                        d->booted = BOOT_DROP; /* connection lost */
 #ifdef MCCP_ENABLED
                     else if (!mccp_process_compressed(d))
-                        d->booted = 1;
+                        d->booted = BOOT_DROP;
 #endif
                 }
 			}
@@ -1819,6 +1819,7 @@ shovechars(void)
     int openfiles_max;
     int i;
     char buf[2048], buf2[256];
+    int do_keepalive = 0;
 #ifdef USE_SSL
     int ssl_status_ok = 1;
 #endif
@@ -1931,8 +1932,7 @@ shovechars(void)
         // sensitive operation. Instead, they override slice timeouts.
         if (tp_keepalive_interval && 
             (msec_diff(current_time, next_keepalive) >= 0)) {
-                //send_keepalives();
-                log_status("Keepalive would be sent.");
+                do_keepalive++; // 
                 next_keepalive = msec_add(current_time,
                                            tp_keepalive_interval * 60000);
         }
@@ -1977,32 +1977,35 @@ shovechars(void)
             if (d->dfile)
                 descr_sendfileblock(d);
 #endif /* DESCRFILE_SUPPORT */
-            /* booted == 2 means QUIT command */
-            /* booted == 3 means immediate clean drop */
-            /* booted == 4 means safeboot -hinoserm */
+            /* This was a tremendous eyesore before. I've tweaked the formatting
+             * to make it more readable, and have created #defines for the
+             * various d->booted settings. -davin */
+
             if (d->booted) {
-                if ((d->booted != 3 && (d->booted != 4 || (d->booted == 4
-                                                           &&
-                                                           !(descr_running_queue
-                                                             (d->descriptor)
-                                                             || d->output.
-                                                             lines)
-                                                           &&
-                                                           !(d->type == CT_HTTP &&
-                                                               in_timequeue(d->http->pid)))))
-                    || (d->type == CT_MUF
-                        && !descr_running_queue(d->descriptor))
-                    || (d->type == CT_INBOUND && d->booted == 1)) {
+                if (// BOOT_DEFERRED is not handled by this loop
+                    (d->booted != BOOT_DEFERRED &&
+                        // only boot CF_MUF if the running queue is empty
+                        (d->type == CT_MUF && !descr_running_queue(d->descriptor)) ||
+                        // only boot CT_INBOUND with BOOT_DROP; ignore other BOOT_ types (why?)
+                        (d->type == CT_INBOUND && d->booted == BOOT_DROP)) ||
+                    // don't boot BOOT_SAFE unless...
+                    (d->booted != BOOT_SAFE || 
+                        (d->booted == BOOT_SAFE &&
+                        // ...no tasks queued, and no output queued...
+                        !(descr_running_queue(d->descriptor) || d->output.lines) &&
+                        // ...and the webserver doesn't have something in the timequeue
+                        !(d->type == CT_HTTP && in_timequeue(d->http->pid))
+                    ))) {
 #ifdef NEWHTTPD
                     if (!(d->flags & DF_HALFCLOSE)) {
 #endif /* NEWHTTPD */
                         process_output(d); /* send the queued notifies */
-                        if (d->booted == 2) /* booted == 2 means QUIT command */
+                        if (d->booted == BOOT_QUIT)
                             goodbye_user(d);
                         process_output(d); /* send QUIT related notifies */
 #ifdef NEWHTTPD
                     }
-                    if (d->type == CT_HTTP && d->booted != 4) {
+                    if (d->type == CT_HTTP && d->booted != BOOT_SAFE) {
                         // d->booted is about to be reset, so this must be set now.
                         d->http->close = 1;
                     } 
@@ -2039,8 +2042,16 @@ shovechars(void)
                         shutdownsock(d);
                         continue; /* this is important, it keeps the FD_SET() code below from breaking. */
                     }
-                }               /* if d->booted != 3 */
+                }               /* if d->booted != BOOT_DEFERRED */
             } /* if (d->booted) */
+
+            if (do_keepalive && DR_RAW_FLAGS(d, DF_TELNET) && !d->inIAC) {
+                buf[0] = TELOPT_IAC;
+                buf[1] = TELOPT_NOP;
+                queue_write(d, buf, 2);
+                do_keepalive--;
+            }
+
             if (d->input.lines > 100)
                 timeout = slice_timeout;
             else
@@ -2345,7 +2356,7 @@ shovechars(void)
                 dnext = d->next;
                 if (FD_ISSET(d->descriptor, &input_set)) {
                     if (!process_input(d)) { /* handle the input */
-                        d->booted = 1; /* read error */
+                        d->booted = BOOT_DROP; /* read error */
                     } else {    /* There was input, manage idle stuff */
                         if (OkObj(d->player) ?
                             Typeof(d->player) == TYPE_PLAYER : 0) {
@@ -2366,15 +2377,15 @@ shovechars(void)
                 }
 #ifdef NEWHTTPD
                 else if (d->flags & DF_HALFCLOSE) {
-                    d->booted = 1;
+                    d->booted = BOOT_DROP;
                 }
 #endif /* NEWHTTPD */
                 if (FD_ISSET(d->descriptor, &output_set)) {
                     if (!process_output(d)) /* send text */
-                        d->booted = 1; /* connection lost */
+                        d->booted = BOOT_DROP; /* connection lost */
 #ifdef MCCP_ENABLED
                     else if (!mccp_process_compressed(d))
-                        d->booted = 1;
+                        d->booted = BOOT_DROP;
 #endif
                 }
                 if (d->connected && OkObj(d->player)) { /* begin the idle FLAG/boots management */
@@ -2456,7 +2467,7 @@ shovechars(void)
                             http_senderror(d, 408, "Server timeout waiting for the HTTP request from the client.");
                         } else {
                             // no method, no love -- punt!
-                            d->booted = 1;
+                            d->booted = BOOT_DROP;
                         }
                     }
 #endif /* NEWHTTPD */
@@ -2481,7 +2492,7 @@ shovechars(void)
                         if ((now - d->connected_at) > curidle &&
                             !(descr_running_queue(d->descriptor)) &&
                             d->type != CT_INBOUND) {
-                            d->booted = 1; /* don't drop if running program */
+                            d->booted = BOOT_DROP; /* don't drop if running program */
                         }
                     } 
                 }               /* if d->connected... */
@@ -2542,7 +2553,7 @@ descr_sendfileblock(struct descriptor_data *d)
 #ifdef NEWHTTPD
             httpfcount--;       /* This is in newhttp.c/newhttp.h */
 #endif
-            d->booted = 4;
+            d->booted = BOOT_SAFE;
         } else if (d->dfile->pid > 0 && in_timequeue(d->dfile->pid)) {
             struct inst temp1;
             struct frame *destfr = timequeue_pid_frame(d->dfile->pid);
@@ -2644,7 +2655,7 @@ wall_and_flush(const char *msg)
             queue_ansi(d, buf);
         }
         if (!process_output(d)) {
-            d->booted = 1;
+            d->booted = BOOT_DROP;
         }
     }
 }
@@ -2672,7 +2683,7 @@ wall_logwizards(const char *msg)
         if (d->connected && (FLAG2(d->player) & F2LOGWALL)) {
             queue_unhtml(d, buf);
             if (!process_output(d))
-                d->booted = 1;
+                d->booted = BOOT_DROP;
         }
     }
 }
@@ -2690,7 +2701,7 @@ wall_arches(const char *msg)
         if (d->connected && /* (d->player >= 0) && */ TArch(d->player)) {
             queue_ansi(d, buf);
             if (!process_output(d)) {
-                d->booted = 1;
+                d->booted = BOOT_DROP;
             }
         }
     }
@@ -2710,7 +2721,7 @@ wall_wizards(const char *msg)
         if (d->connected && /* (d->player >= 0) && */ TMage(d->player)) {
             queue_ansi(d, buf);
             if (!process_output(d)) {
-                d->booted = 1;
+                d->booted = BOOT_DROP;
             }
         }
     }
@@ -2736,7 +2747,7 @@ ansi_wall_wizards(const char *msg)
             }
             queue_ansi(d, buf2);
             if (!process_output(d))
-                d->booted = 1;
+                d->booted = BOOT_DROP;
         }
     }
 }
@@ -2767,7 +2778,7 @@ flush_user_output(dbref player)
     for (di = 0; di < dcount; di++) {
         d = descrdata_by_index(darr[di]);
         if (d && !process_output(d)) {
-            d->booted = 1;
+            d->booted = BOOT_DROP;
         }
     }
 }
@@ -2785,7 +2796,7 @@ wall_all(const char *msg)
     for (d = descriptor_list; d; d = d->next) {
         queue_unhtml(d, buf);
         if (!process_output(d))
-            d->booted = 1;
+            d->booted = BOOT_DROP;
     }
 }
 
@@ -3140,7 +3151,7 @@ FlushText(McpFrame *mfr)
     struct descriptor_data *d = (struct descriptor_data *) mfr->descriptor;
 
     if (d && !process_output(d)) {
-        d->booted = 1;
+        d->booted = BOOT_DROP;
     }
 }
 
@@ -3169,7 +3180,6 @@ telopt_advertise(struct descriptor_data *d)
     queue_write(d, "\xFF\xFD\x18",       3); /* IAC DO TERMTYPE */
     queue_write(d, "\xFF\xFD\x1F",       3); /* IAC DO NAWS */
     queue_write(d, "\xFF\xFD\052",       3); /* IAC DO CHARSET */
-
 }
 
 struct descriptor_data *
@@ -3244,7 +3254,7 @@ initializesock(int s, struct huinfo *hu, int ctype, int cport, int welcome)
     d->prev = &descriptor_list;
     descriptor_list = d;
     if (remember_descriptor(d) < 0)
-        d->booted = 1;          /* Drop the connection ASAP */
+        d->booted = BOOT_DROP;          /* Drop the connection ASAP */
 
     if ((ctype == CT_MUCK ||
 #ifdef USE_SSL
@@ -3692,6 +3702,270 @@ save_command(struct descriptor_data *d, const char *command, int len, int wclen)
     return 1;
 }
 
+// Called by process_input to handle a telnet IAC sequence from a client.
+// Every "if" branch should return 1 to indicate that a character was processed.
+// The default is to return 0. (no sequence processed)
+int
+process_telnet_IAC(struct descriptor_data *d, char *q, char *p)
+{
+    char buf[2];
+    if (d->inIAC == TELOPT_IAC) {
+        switch (*q) {
+            case TELOPT_BRK:   /* Break */
+            case TELOPT_IP:   /* Interrupt Processes */
+                save_command(d, BREAK_COMMAND, sizeof(BREAK_COMMAND), -2);
+                d->inIAC = 0;
+                break;
+            case TELOPT_AYT:{  /* AYT: Are You There? */
+                queue_write(d, "[Yes]\r\n", 7);
+                d->inIAC = 0;
+                break;
+            }
+            case TELOPT_EC:   /* Erase character */
+                if (p > d->raw_input)
+                    --p;
+                d->inIAC = 0;
+                break;
+            case TELOPT_EL:   /* Erase line */
+                p = d->raw_input;
+                d->inIAC = 0;
+                break;
+            case TELOPT_SB:   /* SB */ /* Go ahead. Treat as NOP */
+                if (d->telopt.sb_buf)
+                    free((void *)d->telopt.sb_buf);
+                d->telopt.sb_buf = (unsigned char *)malloc(TELOPT_MAX_BUF_LEN);
+                d->telopt.sb_buf_len = 0;
+
+                d->inIAC = TELOPT_SB;
+                break;
+            case TELOPT_WILL:
+                d->inIAC = TELOPT_WILL;
+                break;
+            case TELOPT_WONT:
+                d->inIAC = TELOPT_WONT;
+                break;
+            case TELOPT_DO:
+                d->inIAC = TELOPT_DO;
+                break;
+            case TELOPT_DONT:
+                d->inIAC = TELOPT_DONT;
+                break;
+            case TELOPT_IAC:   /* IAC a second time */
+                if (d->encoding == ENC_RAW) {
+                    *p++ = *q;
+                    d->inIAC = 0;
+                }
+                break;
+            case TELOPT_NOP:
+            case TELOPT_AO:  /* Abort Output */
+            default:
+                d->inIAC = 0;
+                break;
+        }
+        return 1;
+    } else if (d->inIAC == TELOPT_SB) {
+        if (*q == '\xF0' && *(q-1) == '\xFF') {
+            d->telopt.sb_buf[d->telopt.sb_buf_len-1] = '\0';
+
+            /* Begin processing the TELOPT data buffer */
+            if (d->telopt.sb_buf_len) {
+                switch (d->telopt.sb_buf[0]) {
+                    case TELOPT_NAWS:
+                        if (d->telopt.sb_buf_len != 6)
+                            break;
+
+                        d->telopt.width  =  (d->telopt.sb_buf[1] <<8) | d->telopt.sb_buf[2];
+                        d->telopt.height =  (d->telopt.sb_buf[3] <<8) | d->telopt.sb_buf[4];
+                        
+                        /* that was easy */
+                        break;
+                    case TELOPT_TERMTYPE:
+                        if (d->telopt.sb_buf_len < 2) /* At this point, a valid request would have at least two bytes in it. */
+                            break;
+
+                        if (d->telopt.sb_buf[1] == 1) {
+                            /* 
+                               The client requested our termtype.  Send it.
+                               It would not be proper to send our version number here.
+                            */
+                            queue_write(d, "\xFF\xFA\x00ProtoMUCK\xFF\xF0", 14);
+                        } else if (!d->telopt.sb_buf[1]) {
+                            if (d->telopt.termtype)
+                                free((void *) d->telopt.termtype);
+
+                            if (d->telopt.sb_buf_len < 3) {
+                                /* If the other end sent a blank termtype, don't bother allocating it. */
+                                d->telopt.termtype = NULL;
+                            } else {
+                                d->telopt.termtype = (char *)malloc(sizeof(char) * (d->telopt.sb_buf_len-1));
+
+                                /* Move the data into the termtype string, making sure to add a null at the end. */
+                                memcpy(d->telopt.termtype, d->telopt.sb_buf + 2, d->telopt.sb_buf_len-2);
+                                d->telopt.termtype[d->telopt.sb_buf_len-2] = '\0';
+#ifdef MCCP_ENABLED
+                                /* Due to SimpleMU, we need to determine the termtype before we can enable MCCP. */
+                                if (d->telopt.mccp && !d->mccp)
+                                    mccp_start(d, d->telopt.mccp);
+#endif
+
+                                /* log_status("TELOPT_TERMTYPE(%d): %s\r\n", d->descriptor, d->telopt_termtype); */
+                            }
+                        } /* else { */
+                          /* An unsupported request/response happened */
+                          /* This is where we would implement other sub-negotiation types. */
+                     /* } */
+                        break;
+#ifdef UTF8_SUPPORT
+                    case TELOPT_CHARSET: /* Check if the remote end says they can handle utf8 */
+                        { 
+                            char buf2[MAX_COMMAND_LEN];
+                            int spos, dpos, accepted_charsets = 0;
+                            char sep;
+                            //log_status("DBUG: (%d) IAC SB CHARSET REQUEST %x %x %s -- len: %d\n",
+                            //    d->descriptor,d->telopt.sb_buf[1],d->telopt.sb_buf[2],d->telopt.sb_buf+3,d->telopt.sb_buf_len);
+                            if (d->telopt.sb_buf_len < 3) /* By now we better have CHARSET REQUEST SEP */
+                                break;
+                            if (d->telopt.sb_buf[1] != '\001') /* REQUEST */
+                                break;
+                            if (d->telopt.sb_buf[2]) /* store the requested charset delimiter */
+                                sep = d->telopt.sb_buf[2];
+                            else
+                                break;
+                            //log_status("DBUG: (%d) CHARSET REQUEST, buffer valid, sep is 0x%x\n",d->descriptor,sep);
+                            spos = 3;
+                            dpos = 4;
+                            strncpy(buf2,"\xFF\xFA\x2A\x02",dpos);  /* IAC SB CHARSET ACCEPTED */
+                            /* I just love, scanning for lifeforms */
+                            while (d->telopt.sb_buf[spos]) {
+                                while (!(d->telopt.sb_buf[spos]==sep)) {
+                                    buf2[dpos] = d->telopt.sb_buf[spos];
+                                    dpos++;
+                                    spos++;      
+                                    if (!d->telopt.sb_buf[spos])
+                                        break;
+                                }
+                                /* should now be IAC SB CHARSET ACCEPTED <charset> IAC SE */
+                                buf2[dpos] = '\xFF';
+                                buf2[dpos+1] = '\xF0';
+                                buf2[dpos+2] = '\0';
+                                dpos++;
+                                dpos++;
+                                //log_status("DBUG: (%d) Found charset, created buffer %s\n",d->descriptor,buf2);
+                                /* if utf8 is mentioned in this charset, enable unicode on this descr 
+                                   OBTW: if both ASCII and UNICODE re requested, prefer unicode.
+                                */
+                                if (strcasestr2(buf2,"ascii") || strcasestr2(buf2, "ANSI_X3.4-1968") || strcasestr2(buf2,"UTF-8")) {
+                                    if ((d->encoding < ENC_UTF8) && ((strcasestr2(buf2,"ascii")) || strcasestr2(buf2, "ANSI_X3.4-1968")))
+                                        d->encoding = ENC_ASCII;
+                                    else
+                                        d->encoding = ENC_UTF8;
+                                }
+                                queue_write(d, buf2, dpos+1);
+                                accepted_charsets++;
+                                //log_status("DBUG: (%d) IAC SB CHARSET ACCEPTED %s IAC SE, accepted: %d\n",
+                                //    d->descriptor,buf2,accepted_charsets);
+                                spos++;
+                                dpos = 4; // Reuse this buffer  
+                            }
+                            if (!accepted_charsets) {
+                                /* IAC SB CHARSET REJECTED IAC SE */
+                                queue_write(d, "\xFF\xFA\x2A\x03\xFF\xF0", 6);
+                                //log_status("DBUG: (%d) IAC SB CHARSET REJECTED IAC SE, accepted: %d\n",
+                                //    d->descriptor,accepted_charsets);
+                            }
+                        break;
+                    }
+#endif
+                    default:
+                        break;
+                }
+            }
+
+            free((void *)d->telopt.sb_buf); /* don't need the buffer anymore */
+            d->telopt.sb_buf = NULL;
+            d->telopt.sb_buf_len = 0;
+
+            d->inIAC = 0;
+        } else {
+            if (d->telopt.sb_buf_len < TELOPT_MAX_BUF_LEN)
+                d->telopt.sb_buf[d->telopt.sb_buf_len++] = *q;
+            else
+                d->inIAC = 0;
+        }
+        return 1;
+    } else if (d->inIAC == TELOPT_WILL) {
+        if (*q == TELOPT_TERMTYPE) { /* TERMTYPE */
+            queue_write(d, "\xFF\xFA\x18\x01\xFF\xF0", 6); /* IAC SB TERMTYPE SEND IAC SE */
+        } else if (*q == TELOPT_MSSP) {
+            mssp_send(d);
+        } else if (*q == TELOPT_NAWS) {
+            /* queue_write(d, "\xFF\xFD\x1F", 3); */ /* Oops, infinite loop */
+        } else if (*q == TELOPT_CHARSET) {
+            //log_status("DBUG: (%d) IAC WILL CHARSET\n",d->descriptor);
+            /* Just have to wait for the DO now. */
+        } else {
+            /* send back DONT option in all other cases */
+            queue_write(d, "\xFF\xFE", 2);
+            queue_write(d, q, 1);
+        }
+        d->inIAC = 0;
+        return 1;
+    } else if (d->inIAC == TELOPT_DO) {
+#ifdef MCCP_ENABLED
+        if (*q == TELOPT_MCCP2) {        /* TELOPT_COMPRESS2 */
+            d->telopt.mccp = 2;
+                
+            /* Thanks to SimpleMU, we're required to know the termtype before we can enable MCCP. */
+            if (d->telopt.termtype && !d->mccp)
+                mccp_start(d, d->telopt.mccp);
+        } else if (*q == TELOPT_MSSP) {
+            mssp_send(d);
+        } else if (*q == TELOPT_NAWS) {
+        //} else if (*q == TELOPT_CHARSET) {
+        //    charset_send(d);
+        //    queue_write(d, "UTF-8\xFC", 6);
+        } else {
+            /* Send back WONT in all cases */
+            queue_write(d, "\xFF\xFC", 2);
+            queue_write(d, q, 1);
+        }
+#else
+        queue_write(d, "\377\374", 2);
+        queue_write(d, q, 1);
+#endif
+
+        d->inIAC = 0;
+        return 1;
+    } else if (d->inIAC == TELOPT_DONT) {
+#ifdef MCCP_ENABLED
+        if (*q == TELOPT_MCCP2) {        /* TELOPT_COMPRESS2 */
+            d->telopt.mccp = 0;
+            mccp_end(d);
+        } else if (*q == TELOPT_MSSP) {
+        } else if (*q == TELOPT_NAWS) {
+        } else {
+            /* Send back WONT in all cases */
+            queue_write(d, "\377\xFC", 2);
+            queue_write(d, q, 1);
+        }
+#else
+        queue_write(d, "\377\374", 2); 
+        queue_write(d, q, 1);
+#endif
+        d->inIAC = 0;
+        return 1;
+    } else if (d->inIAC == TELOPT_WONT) {
+        d->inIAC = 0;
+        return 1;
+    } else if (*q == TELOPT_IAC) {
+        /* Got TELNET IAC, store for next byte */
+        d->inIAC = TELOPT_IAC;
+        return 1;
+    }
+
+    return 0;
+}
+
 int
 process_input(struct descriptor_data *d)
 {
@@ -3794,249 +4068,10 @@ process_input(struct descriptor_data *d)
                 }
             }
             p = d->raw_input;
-        } else if (d->inIAC == 1) {
-            switch (*q) {
-                case '\361':   /* NOP */
-                    d->inIAC = 0;
-                    break;
-                case '\363':   /* Break */
-                case '\364':   /* Interrupt Processes */
-                    save_command(d, BREAK_COMMAND, sizeof(BREAK_COMMAND), -2);
-                    d->inIAC = 0;
-                    break;
-                case '\365':   /* Abort output */
-                    d->inIAC = 0;
-                    break;
-                case '\366':{  /* AYT */
-                    queue_write(d, "[Yes]\r\n", 7);
-                    d->inIAC = 0;
-                    break;
-                }
-                case '\367':   /* Erase character */
-                    if (p > d->raw_input)
-                        --p;
-                    d->inIAC = 0;
-                    break;
-                case '\370':   /* Erase line */
-                    p = d->raw_input;
-                    d->inIAC = 0;
-                    break;
-                case TELOPT_SB:   /* SB */ /* Go ahead. Treat as NOP */
-                    if (d->telopt.sb_buf)
-                        free((void *)d->telopt.sb_buf);
-                    d->telopt.sb_buf = (unsigned char *)malloc(TELOPT_MAX_BUF_LEN);
-                    d->telopt.sb_buf_len = 0;
-
-                    d->inIAC = 5;
-                    break;
-                case TELOPT_WILL:   /* Will option offer */
-                    d->inIAC = 2;
-                    break;
-                case TELOPT_WONT:   /* won't option */
-                    d->inIAC = 4;
-                    break;
-                case TELOPT_DO:   /* DO option request */
-                    d->inIAC = TELOPT_DO;
-                    break;
-                case TELOPT_DONT:   /* DONT option request */
-                    d->inIAC = TELOPT_DONT;
-                    break;
-                case TELOPT_IAC:   /* IAC a second time */
-#if 1
-                    /* for future 8 bit clean code, perhaps */
-                    /* the future, is NOW! -hinoserm */
-                    *p++ = *q;
-#endif
-                    d->inIAC = 0;
-                    break;
-                default:
-                    d->inIAC = 0;
-                    break;
-            }
-        } else if (d->inIAC == 5) {
-            if (*q == '\xF0' && *(q-1) == '\xFF') {
-                d->telopt.sb_buf[d->telopt.sb_buf_len-1] = '\0';
-
-                /* Begin processing the TELOPT data buffer */
-                if (d->telopt.sb_buf_len) {
-                    switch (d->telopt.sb_buf[0]) {
-                        case TELOPT_NAWS:
-                            if (d->telopt.sb_buf_len != 6)
-                                break;
-
-                            d->telopt.width  =  (d->telopt.sb_buf[1] <<8) | d->telopt.sb_buf[2];
-                            d->telopt.height =  (d->telopt.sb_buf[3] <<8) | d->telopt.sb_buf[4];
-                            
-                            /* that was easy */
-                            break;
-                        case TELOPT_TERMTYPE:
-                            if (d->telopt.sb_buf_len < 2) /* At this point, a valid request would have at least two bytes in it. */
-                                break;
-
-                            if (d->telopt.sb_buf[1] == 1) {
-                                /* 
-                                   The client requested our termtype.  Send it.
-                                   It would not be proper to send our version number here.
-                                */
-                                queue_write(d, "\xFF\xFA\x00ProtoMUCK\xFF\xF0", 14);
-                            } else if (!d->telopt.sb_buf[1]) {
-                                if (d->telopt.termtype)
-                                    free((void *) d->telopt.termtype);
-
-                                if (d->telopt.sb_buf_len < 3) {
-                                    /* If the other end sent a blank termtype, don't bother allocating it. */
-                                    d->telopt.termtype = NULL;
-                                } else {
-                                    d->telopt.termtype = (char *)malloc(sizeof(char) * (d->telopt.sb_buf_len-1));
-
-                                    /* Move the data into the termtype string, making sure to add a null at the end. */
-                                    memcpy(d->telopt.termtype, d->telopt.sb_buf + 2, d->telopt.sb_buf_len-2);
-                                    d->telopt.termtype[d->telopt.sb_buf_len-2] = '\0';
-#ifdef MCCP_ENABLED
-                                    /* Due to SimpleMU, we need to determine the termtype before we can enable MCCP. */
-                                    if (d->telopt.mccp && !d->mccp)
-                                        mccp_start(d, d->telopt.mccp);
-#endif
-
-                                    /* log_status("TELOPT_TERMTYPE(%d): %s\r\n", d->descriptor, d->telopt_termtype); */
-                                }
-                            } /* else { */
-                              /* An unsupported request/response happened */
-                              /* This is where we would implement other sub-negotiation types. */
-                         /* } */
-                            break;
-#ifdef UTF8_SUPPORT
-                        case TELOPT_CHARSET: /* Check if the remote end says they can handle utf8 */
-							{ 
-								char buf2[MAX_COMMAND_LEN];
-								int spos, dpos, accepted_charsets = 0;
-								char sep;
-								//log_status("DBUG: (%d) IAC SB CHARSET REQUEST %x %x %s -- len: %d\n",
-								//    d->descriptor,d->telopt.sb_buf[1],d->telopt.sb_buf[2],d->telopt.sb_buf+3,d->telopt.sb_buf_len);
-								if (d->telopt.sb_buf_len < 3) /* By now we better have CHARSET REQUEST SEP */
-									break;
-								if (d->telopt.sb_buf[1] != '\001') /* REQUEST */
-									break;
-								if (d->telopt.sb_buf[2]) /* store the requested charset delimiter */
-									sep = d->telopt.sb_buf[2];
-								else break;
-								//log_status("DBUG: (%d) CHARSET REQUEST, buffer valid, sep is 0x%x\n",d->descriptor,sep);
-								spos = 3; dpos = 4;
-								strncpy(buf2,"\xFF\xFA\x2A\x02",dpos);  /* IAC SB CHARSET ACCEPTED */
-								/* I just love, scanning for lifeforms */
-								while (d->telopt.sb_buf[spos]) {
-									while (!(d->telopt.sb_buf[spos]==sep)) {
-											buf2[dpos] = d->telopt.sb_buf[spos];
-											dpos++; spos++;      
-											if (!d->telopt.sb_buf[spos]) break;
-									}
-									/* should now be IAC SB CHARSET ACCEPTED <charset> IAC SE */
-									buf2[dpos] = '\xFF'; buf2[dpos+1] = '\xF0'; buf2[dpos+2] = '\0'; dpos++; dpos++;
-									//log_status("DBUG: (%d) Found charset, created buffer %s\n",d->descriptor,buf2);
-									/* if utf8 is mentioned in this charset, enable unicode on this descr 
-									   OBTW: if both ASCII and UNICODE re requested, prefer unicode.
-									*/
-									if (strcasestr2(buf2,"ascii") || strcasestr2(buf2, "ANSI_X3.4-1968") || strcasestr2(buf2,"UTF-8")) {
-										if ((d->encoding < ENC_UTF8) && ((strcasestr2(buf2,"ascii")) || strcasestr2(buf2, "ANSI_X3.4-1968")))
-											d->encoding = ENC_ASCII;
-										else
-											d->encoding = ENC_UTF8;
-									}
-									queue_write(d, buf2, dpos+1);
-									accepted_charsets++;
-									//log_status("DBUG: (%d) IAC SB CHARSET ACCEPTED %s IAC SE, accepted: %d\n",
-									//    d->descriptor,buf2,accepted_charsets);
-									spos++; dpos = 4; // Reuse this buffer  
-								}
-								if (!accepted_charsets) {
-									/* IAC SB CHARSET REJECTED IAC SE */
-									queue_write(d, "\xFF\xFA\x2A\x03\xFF\xF0", 6);
-									//log_status("DBUG: (%d) IAC SB CHARSET REJECTED IAC SE, accepted: %d\n",
-									//    d->descriptor,accepted_charsets);
-								}
-							break;
-						}
-#endif
-                        default:
-                            break;
-                    }
-                }
-
-                free((void *)d->telopt.sb_buf); /* don't need the buffer anymore */
-                d->telopt.sb_buf = NULL;
-                d->telopt.sb_buf_len = 0;
-
-                d->inIAC = 0;
-            } else {
-                if (d->telopt.sb_buf_len < TELOPT_MAX_BUF_LEN)
-                    d->telopt.sb_buf[d->telopt.sb_buf_len++] = *q;
-                else
-                    d->inIAC = 0;
-            }
-        } else if (d->inIAC == 2) { /* WILL */
-            if (*q == TELOPT_TERMTYPE) { /* TERMTYPE */
-                queue_write(d, "\xFF\xFA\x18\x01\xFF\xF0", 6); /* IAC SB TERMTYPE SEND IAC SE */
-            } else if (*q == TELOPT_MSSP) {
-                mssp_send(d);
-            } else if (*q == TELOPT_NAWS) {
-                /* queue_write(d, "\xFF\xFD\x1F", 3); */ /* Oops, infinite loop */
-            } else if (*q == TELOPT_CHARSET) {
-                //log_status("DBUG: (%d) IAC WILL CHARSET\n",d->descriptor);
-                /* Just have to wait for the DO now. */
-            } else {
-                /* send back DONT option in all other cases */
-                queue_write(d, "\377\376", 2);
-                queue_write(d, q, 1);
-            }
-            d->inIAC = 0;
-        } else if (d->inIAC == TELOPT_DO) {
-#ifdef MCCP_ENABLED
-            if (*q == TELOPT_MCCP2) {        /* TELOPT_COMPRESS2 */
-                d->telopt.mccp = 2;
-					
-                /* Thanks to SimpleMU, we're required to know the termtype before we can enable MCCP. */
-                if (d->telopt.termtype && !d->mccp)
-                    mccp_start(d, d->telopt.mccp);
-            } else if (*q == TELOPT_MSSP) {
-                mssp_send(d);
-            } else if (*q == TELOPT_NAWS) {
-            //} else if (*q == TELOPT_CHARSET) {
-            //    charset_send(d);
-            //    queue_write(d, "UTF-8\xFC", 6);
-            } else {
-                /* Send back WONT in all cases */
-                queue_write(d, "\377\xFC", 2);
-                queue_write(d, q, 1);
-            }
-#else
-            queue_write(d, "\377\374", 2);
-            queue_write(d, q, 1);
-#endif
-
-            d->inIAC = 0;
-        } else if (d->inIAC == TELOPT_DONT) {
-#ifdef MCCP_ENABLED
-            if (*q == TELOPT_MCCP2) {        /* TELOPT_COMPRESS2 */
-                d->telopt.mccp = 0;
-				mccp_end(d);
-            } else if (*q == TELOPT_MSSP) {
-            } else if (*q == TELOPT_NAWS) {
-            } else {
-                /* Send back WONT in all cases */
-                queue_write(d, "\377\xFC", 2);
-                queue_write(d, q, 1);
-            }
-#else
-			queue_write(d, "\377\374", 2);
-            queue_write(d, q, 1);
-#endif
-            d->inIAC = 0;
-        } else if (d->inIAC == 4) {
-            /* ignore WON'T option */
-            d->inIAC = 0;
-        } else if (DR_RAW_FLAGS(d, DF_TELNET) && *q == '\377') {
-            /* Got TELNET IAC, store for next byte */
-            d->inIAC = 1;
+        } else if (process_telnet_IAC(d, q, p)) {
+            // This is where the telopt processing code used to be. It has been
+            // moved to process_telnet_IAC to keep process_input cleaner.
+            // It will return 0 if we should keep going.
         } else if (p < pend && !d->truncate) {
             if ((*q == '\t')
                 & (d->type == CT_MUCK || d->type == CT_PUEBLO)) {
@@ -4179,7 +4214,7 @@ process_commands(void)
                 sprintf(buf, "@Ports/%d/MUF", d->cport);
                 mufprog = get_property_dbref((dbref) 0, buf);
                 if (OkObj(mufprog) && (!descr_running_queue(d->descriptor))
-                    && (d->booted != 3)) {
+                    && (d->booted != BOOT_DEFERRED)) {
                     struct frame *tmpfr;
 
                     strcpy(match_args, "MUF");
@@ -4189,7 +4224,8 @@ process_commands(void)
                     if (tmpfr) {
                         interp_loop(NOTHING, mufprog, tmpfr, 1);
                     }
-                    d->booted = 3;
+                    // bypass the usual d->booted descriptor loop
+                    d->booted = BOOT_DEFERRED;
                     continue;
                 }
             }
@@ -4257,7 +4293,7 @@ process_commands(void)
                                 interp_loop(d->player, tp_quit_prog, tmpfr, 0);
                             }
                         } else {
-                            d->booted = 2;
+                            d->booted = BOOT_QUIT;
                         }
                     }
 
@@ -4532,7 +4568,7 @@ check_connect(struct descriptor_data *d, const char *msg)
                 add_property(player, "@/Failed/Count", NULL, result);
             }
             if (d->fails >= 3)
-                d->booted = 1;
+                d->booted = BOOT_DROP;
             if (tp_log_connects)
                 log2filetime(CONNECT_LOG,
                              "FAIL: %2d %s pw '%s' %s(%s) %s P#%d\n",
@@ -4560,7 +4596,7 @@ check_connect(struct descriptor_data *d, const char *msg)
                         d->descriptor, unparse_object(player, player),
                         d->hu->h->name, d->hu->u->user,
                         host_as_hex(d->hu->h->a), why, d->cport);
-            d->booted = 1;
+            d->booted = BOOT_DROP;
         } else if (reg_user_is_barred(d->hu->h->a, player) == TRUE) {
             char buf[1024];
 
@@ -4575,7 +4611,7 @@ check_connect(struct descriptor_data *d, const char *msg)
                         d->descriptor, unparse_object(player, player),
                         d->hu->h->name, d->hu->u->user,
                         host_as_hex(d->hu->h->a), d->cport);
-            d->booted = 1;
+            d->booted = BOOT_DROP;
         } else if ((wizonly_mode ||
                     (tp_playermax && con_players_curr >= tp_playermax_limit)) &&
                    !TMage(player)
@@ -4590,7 +4626,7 @@ check_connect(struct descriptor_data *d, const char *msg)
                 queue_ansi(d, BOOT_MESG);
             }
             queue_ansi(d, "\r\n");
-            d->booted = 1;
+            d->booted = BOOT_DROP;
         } else {
             if (!string_compare(command, "ch") &&
                 !(Arch(player) || POWERS(player) & POW_HIDE)) {
@@ -4769,7 +4805,7 @@ boot_off(dbref player)
 
     if (last) {
         process_output(last);
-        last->booted = 1;
+        last->booted = BOOT_DROP;
         /* shutdownsock(last); */
         return 1;
     }
@@ -4796,7 +4832,7 @@ boot_player_off(dbref player)
             d->connected = 0;
             d->player = NOTHING;
             if (!d->booted)
-                d->booted = 1;
+                d->booted = BOOT_DROP;
         }
     }
     update_desc_count_table();
@@ -5056,7 +5092,7 @@ do_dwall(dbref player, const char *name, const char *msg)
 
     queue_ansi(d, buf);
     if (!process_output(d))
-        d->booted = 1;
+        d->booted = BOOT_DROP;
     anotify_fmt(player, CSUCC "Message sent to descriptor %d.", d->descriptor);
 }
 
@@ -5099,7 +5135,7 @@ do_dboot(dbref player, const char *name)
         }
     }
 
-    d->booted = 1;
+    d->booted = BOOT_DROP;
     anotify(player, CSUCC "Booted.");
 }
 
@@ -6195,7 +6231,7 @@ pboot(int count)
 
     if (d) {
         process_output(d);
-        d->booted = 1;
+        d->booted = BOOT_DROP;
         /* shutdownsock(d); */
     }
 }
@@ -6209,7 +6245,7 @@ pdboot(int c)
 
     if (d) {
         process_output(d);
-        d->booted = 1;
+        d->booted = BOOT_DROP;
         /* shutdownsock(d); */
     }
 }
@@ -6629,14 +6665,14 @@ pdescrflush(int c)
         d = descrdata_by_descr(c);
         if (d) {
             if (!process_output(d)) {
-                d->booted = 1;
+                d->booted = BOOT_DROP;
             }
             i++;
         }
     } else {
         for (d = descriptor_list; d; d = d->next) {
             if (!process_output(d)) {
-                d->booted = 1;
+                d->booted = BOOT_DROP;
             }
             i++;
         }

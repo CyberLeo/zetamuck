@@ -27,8 +27,6 @@
 
 #define TELOPT_IAC      '\xFF'
 
-#define TELOPT_NOP      '\xF1'
-
 #define TELOPT_DO       '\xFD'
 #define TELOPT_DONT     '\xFE'
 
@@ -47,6 +45,22 @@
 #define TELOPT_MSSP_VAR '\x01'
 #define TELOPT_MSSP_VAL '\x02'
 #define TELOPT_CHARSET  '\x2A'
+
+#define TELOPT_BRK      '\xF3'
+#define TELOPT_IP       '\xF4'
+
+#define TELOPT_EC       '\xF7'
+#define TELOPT_EL       '\xF8'
+
+#define TELOPT_NOP      '\xF1'
+#define TELOPT_AO       '\xF5'
+#define TELOPT_AYT      '\xF6'
+
+#define BOOT_DROP       1 /* the most common case, server choosing to disconnect client */
+#define BOOT_QUIT       2 /* player QUIT command */
+#define BOOT_DEFERRED   3 /* set once the MUF interpreter is associated with a CT_MUF connection;
+                             bypass the usual loop around d->booted. */
+#define BOOT_SAFE       4 /* disconnect when the descriptor has no tasks or output queued */
 
 #define ENC_RAW         0
 #define ENC_ASCII       1
@@ -153,7 +167,7 @@ struct descriptor_data {
     int                      connected;     /* Connected as a player? */
     int                      did_connect;   /* Was connected to a player? */
     int                      con_number;    /* Connection number */
-    int                      booted;        /* 1 = Booted, 2 = Boot with message, 3 = WEB boot */
+    int                      booted;        /* refer to BOOT_ defines */
     int                      fails;         /* Number of fail connection attempts */
     int                      block;         /* Is this descriptor blocked of input? */
     dbref                   *prog;          /* Which programs are blocking the input? -- UNIMPLEMENTED */
