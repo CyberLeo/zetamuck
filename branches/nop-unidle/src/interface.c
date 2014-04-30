@@ -4102,7 +4102,7 @@ process_input(struct descriptor_data *d)
                     if (!isascii(*p) && d->encoding == ENC_UTF8) {
                         do {
                             p--;
-                        } while ( (*p >= '\x80') && (*p <= '\xbf') );
+                        } while ( p > d->raw_input && (*p >= '\x80') && (*p <= '\xbf') );
                     }
                     wcbuflen--;
 #endif
