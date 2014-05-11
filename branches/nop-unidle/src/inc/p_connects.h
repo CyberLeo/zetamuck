@@ -45,7 +45,6 @@ extern void prim_descr_flagp(PRIM_PROTOTYPE);
 extern void prim_bandwidth(PRIM_PROTOTYPE);
 extern void prim_descrbufsize(PRIM_PROTOTYPE);
 extern void prim_descr_sslp(PRIM_PROTOTYPE);
-extern void prim_descr_telnet(PRIM_PROTOTYPE);
 extern void prim_descr_sendfile(PRIM_PROTOTYPE);
 extern void prim_descrtype(PRIM_PROTOTYPE);
 extern void prim_suid(PRIM_PROTOTYPE);
@@ -67,9 +66,8 @@ extern void prim_mccp_end(PRIM_PROTOTYPE);
     prim_descrconport, prim_firstdescr, prim_lastdescr,                     \
     prim_descrleastidle, prim_descrmostidle, prim_descrboot,                \
     prim_getdescrinfo, prim_descr_set, prim_descr_flagp, prim_bandwidth,    \
-    prim_descrbufsize, prim_descr_sslp, prim_descr_sendfile,                \
-    prim_descr_telnet, prim_suid, prim_descrtype, prim_mccp_start,          \
-    prim_mccp_end
+    prim_descrbufsize, prim_descr_sslp, prim_descr_sendfile, prim_suid,     \
+    prim_descrtype, prim_mccp_start, prim_mccp_end
 
 #define PRIMS_CONNECTS_NAMES "AWAKE?", "ONLINE", "CONCOUNT",  \
     "CONDBREF", "CONIDLE", "CONTIME", "CONHOST", "CONUSER",   \
@@ -83,9 +81,8 @@ extern void prim_mccp_end(PRIM_PROTOTYPE);
     "DESCRCONPORT", "FIRSTDESCR", "LASTDESCR",                \
     "DESCRLEASTIDLE", "DESCRMOSTIDLE", "DESCRBOOT",           \
     "GETDESCRINFO", "DESCR_SET", "DESCR_FLAG?", "BANDWIDTH",  \
-    "DESCRBUFSIZE", "DESCR_SSL?", "DESCR_SENDFILE",           \
-    "DESCR_TELNET", "SUID", "DESCRTYPE", "MCCP_START",        \
-    "MCCP_END"
+    "DESCRBUFSIZE", "DESCR_SSL?", "DESCR_SENDFILE", "SUID",   \
+    "DESCRTYPE", "MCCP_START", "MCCP_END"
 
-#define PRIMS_CONNECTS_CNT 53
+#define PRIMS_CONNECTS_CNT 52
 

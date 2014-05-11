@@ -155,10 +155,12 @@ struct mccp {
 struct telopt {
     unsigned char           *sb_buf;        /* hinoserm: Used by SD request/response system, init to NULL */
     size_t                   sb_buf_len;    /* hinoserm: Used by SD request/response system, init to 0 */
-    char                    *termtype;      /* hinoserm: Indicates the client's TERMINAL TYPE info, or NULL */
     signed char              mccp;          /* hinoserm: Indicates that client is able/willing to compress */
     unsigned short           width;         /* hinoserm: for NAWS */
     unsigned short           height;        /* hinoserm: for NAWS */
+    int                      termtypes_cnt;  /* davin: current position in termtype cycling */
+    stk_array               *termtypes;     /* davin: packed/list style array containing all seen termtypes */
+    long int                 mtts;          /* davin: MTTS bitvector. http://tintin.sourceforge.net/mtts/ */
 };
 
 

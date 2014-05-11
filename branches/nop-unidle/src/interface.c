@@ -93,6 +93,8 @@ struct udp_frame udp_sockets[34];
 int udp_count;
 #endif
 
+struct shared_string *termtype_init_state = NULL;
+
 void parse_connect(const char *msg, char *command, char *user, char *pass);
 void check_connect(struct descriptor_data *d, const char *msg);
 void dump_users(struct descriptor_data *d, char *user);
@@ -122,6 +124,9 @@ bool mccp_process_compressed(struct descriptor_data *d);
 #define UMIN(a,b) ((a)<(b)?(a):(b))
 #endif
 
+
+
+void termtypes_init(struct telopt *t);
 void telopt_init(struct telopt *t);
 void telopt_clean(struct telopt *t);
 
@@ -1982,20 +1987,21 @@ shovechars(void)
              * various d->booted settings. -davin */
 
             if (d->booted) {
-                if (// BOOT_DEFERRED is not handled by this loop
-                    (d->booted != BOOT_DEFERRED &&
-                        // only boot CF_MUF if the running queue is empty
-                        (d->type == CT_MUF && !descr_running_queue(d->descriptor)) ||
-                        // only boot CT_INBOUND with BOOT_DROP; ignore other BOOT_ types (why?)
-                        (d->type == CT_INBOUND && d->booted == BOOT_DROP)) ||
-                    // don't boot BOOT_SAFE unless...
-                    (d->booted != BOOT_SAFE || 
-                        (d->booted == BOOT_SAFE &&
+                // BOOT_DROP and BOOT_QUIT are unconditional punts.
+
+                if (// boot BOOT_SAFE if...
+                    (d->booted == BOOT_SAFE &&
                         // ...no tasks queued, and no output queued...
                         !(descr_running_queue(d->descriptor) || d->output.lines) &&
                         // ...and the webserver doesn't have something in the timequeue
-                        !(d->type == CT_HTTP && in_timequeue(d->http->pid))
-                    ))) {
+                        !(d->type == CT_HTTP && in_timequeue(d->http->pid))) ||
+                    // ignore BOOT_DEFERRED and BOOT_SAFE unless...
+                    (d->booted != BOOT_DEFERRED && d->booted != BOOT_SAFE) ||
+                    // ...type is CF_MUF and the running queue is empty.
+                    (d->type == CT_MUF && !descr_running_queue(d->descriptor))
+                    // this check used to be here, but was never evaluated.
+                    //(d->type == CT_INBOUND && d->booted == BOOT_DROP)
+                   ) {
 #ifdef NEWHTTPD
                     if (!(d->flags & DF_HALFCLOSE)) {
 #endif /* NEWHTTPD */
@@ -2045,7 +2051,8 @@ shovechars(void)
                 }               /* if d->booted != BOOT_DEFERRED */
             } /* if (d->booted) */
 
-            if (do_keepalive && DR_RAW_FLAGS(d, DF_TELNET) && !d->inIAC) {
+            if (do_keepalive && DR_RAW_FLAGS(d, DF_TELNET) &&
+                    DR_RAW_FLAGS(d, DF_KEEPALIVE) && !d->inIAC) {
                 buf[0] = TELOPT_IAC;
                 buf[1] = TELOPT_NOP;
                 queue_write(d, buf, 2);
@@ -3709,7 +3716,12 @@ int
 process_telnet_IAC(struct descriptor_data *d, char *q, char *p)
 {
     char buf[2];
+
     if (d->inIAC == TELOPT_IAC) {
+        // Client sent us IAC; assume IAC+NOP is safe and enable keepalives.
+        if (!DR_RAW_FLAGS(d, DF_KEEPALIVE)) {
+            DR_RAW_ADD_FLAGS(d, DF_KEEPALIVE);
+        }
         switch (*q) {
             case TELOPT_BRK:   /* Break */
             case TELOPT_IP:   /* Interrupt Processes */
@@ -3790,26 +3802,144 @@ process_telnet_IAC(struct descriptor_data *d, char *q, char *p)
                             */
                             queue_write(d, "\xFF\xFA\x00ProtoMUCK\xFF\xF0", 14);
                         } else if (!d->telopt.sb_buf[1]) {
-                            if (d->telopt.termtype)
-                                free((void *) d->telopt.termtype);
+                            /* If the other end sent a blank termtype, don't bother allocating it. */
+                            //if (d->telopt.sb_buf_len < 3) {
+                            //    d->telopt.termtype = NULL;
+                            //} else {
+                            //d->telopt.termtype = (char *)malloc(sizeof(char) * (d->telopt.sb_buf_len-1));
+                            char termtype[TELOPT_MAX_BUF_LEN];
+                            char *last_termtype;
+                            struct inst temp1;
+                            struct inst temp2;
 
-                            if (d->telopt.sb_buf_len < 3) {
-                                /* If the other end sent a blank termtype, don't bother allocating it. */
-                                d->telopt.termtype = NULL;
+                            /* Move the data into the termtype string, making sure to add a null at the end. */
+                            //memcpy(d->telopt.termtype, d->telopt.sb_buf + 2, d->telopt.sb_buf_len-2);
+                            //d->telopt.termtype[d->telopt.sb_buf_len-2] = '\0';
+                            if (d->telopt.sb_buf_len >= 3) {
+                                memcpy(termtype, d->telopt.sb_buf + 2, d->telopt.sb_buf_len-2);
+                                termtype[d->telopt.sb_buf_len-2] = '\0';
                             } else {
-                                d->telopt.termtype = (char *)malloc(sizeof(char) * (d->telopt.sb_buf_len-1));
-
-                                /* Move the data into the termtype string, making sure to add a null at the end. */
-                                memcpy(d->telopt.termtype, d->telopt.sb_buf + 2, d->telopt.sb_buf_len-2);
-                                d->telopt.termtype[d->telopt.sb_buf_len-2] = '\0';
-#ifdef MCCP_ENABLED
-                                /* Due to SimpleMU, we need to determine the termtype before we can enable MCCP. */
-                                if (d->telopt.mccp && !d->mccp)
-                                    mccp_start(d, d->telopt.mccp);
-#endif
-
-                                /* log_status("TELOPT_TERMTYPE(%d): %s\r\n", d->descriptor, d->telopt_termtype); */
+                                // Blank termtype.
+                                termtype[0] = '\0';
                             }
+
+                            if (d->telopt.termtypes_cnt == 0) {
+                                /* First seen termtype: the primary, i.e. name of client.
+                                 * We need to be aware of the fact that this might be a second
+                                 * attempt to cycle through termtypes, and reset our termtypes
+                                 * array if that's the case. */
+                                if (d->telopt.termtypes->items > 1) {
+                                    termtypes_init(&d->telopt);
+                                }
+
+                                d->telopt.termtypes_cnt++;
+                            } else {
+                                // Check to see if cycling has begun...
+                                temp1.type = PROG_INTEGER;
+                                temp1.data.number = d->telopt.termtypes_cnt - 1;
+
+                                temp2 = *(array_getitem(d->telopt.termtypes, &temp1));
+                                last_termtype = temp2.data.string->data;
+
+                                //last_termtype = d->termtypes->data.packed[d->termtypes->items].data.string;
+                                if ((!*termtype && last_termtype == termtype_init_state->data) ||
+                                        (!string_compare(termtype, last_termtype))) {
+                                    /* String matched last reported termtype. We're done.
+                                     * This sets the count back to zero, which prevents us
+                                     * from requesting further termtypes and starts us over
+                                     * from scratch in the event that the client sends us
+                                     * another TERMTYPE unsolicited. */
+                                    d->telopt.termtypes_cnt = 0;
+                                }
+
+
+                                if (*termtype && d->telopt.termtypes_cnt == 1) {
+                                    // Second seen termtype...actual "type".
+                                    //
+                                    if (string_prefix(termtype, "DUMB")) {
+                                        // ragequit
+                                    } else if (has_suffix(termtype, "-256COLOR")) {
+                                        DR_RAW_ADD_FLAGS(d, DF_COLOR);
+                                        DR_RAW_ADD_FLAGS(d, DF_256COLOR);
+                                    } else if (string_prefix(termtype, "ANSI") ||
+                                                   string_prefix(termtype, "VT100") ||
+                                                   string_prefix(termtype, "SCREEN")) {
+                                        DR_RAW_ADD_FLAGS(d, DF_COLOR);
+                                    } else if (string_prefix(termtype, "XTERM")) {
+                                        DR_RAW_ADD_FLAGS(d, DF_COLOR);
+                                        DR_RAW_ADD_FLAGS(d, DF_256COLOR);
+                                    }
+                                    d->telopt.termtypes_cnt++;
+                                } else if (*termtype && d->telopt.termtypes_cnt == 2) {
+                                    // Third termtype...candidate for MTTS.
+                                    if (string_prefix(termtype, "MTTS ")) {
+                                        char *tailptr;
+                                        d->telopt.mtts = strtol(termtype+5, &tailptr, 10);
+                                        if (*tailptr != '\0') {
+                                            // bogus MTTS value, reset it.
+                                            d->telopt.mtts = 0;
+                                        } else {
+                                            /* Got MTTS...detect capabilities.
+                                             * 
+                                             * Not implemented:
+                                             *   2 = VT100
+                                             *  16 = Mouse Tracking
+                                             *  32 = OSC Color Palette
+                                             *  64 = Screen Reader
+                                             * 128 = Proxy */
+                                            if (d->telopt.mtts & 1) // ANSI COLOR
+                                                DR_RAW_ADD_FLAGS(d, DF_COLOR);
+                                            if (d->telopt.mtts & 4) // UTF-8
+                                                d->encoding = ENC_UTF8;
+                                            if (d->telopt.mtts & 8) // 256 COLOR
+                                                DR_RAW_ADD_FLAGS(d, DF_256COLOR);
+                                        }
+
+                                    }
+                                    d->telopt.termtypes_cnt++;
+                                } else if (d->telopt.termtypes_cnt != 0) {
+                                    // No special processing here, just keep going.
+                                    d->telopt.termtypes_cnt++;
+                                }
+                            }
+                            if (d->telopt.termtypes_cnt) {
+
+                                if (d->telopt.termtypes_cnt == 1 && *termtype) {
+                                    /* We only need to set termtype on first pass if it
+                                     * is non-null, termtypes_init handled it otherwise. */
+                                    temp1.type = PROG_STRING;
+                                    temp1.data.string = alloc_prog_string(termtype);
+                                    temp2.type = PROG_INTEGER;
+                                    temp2.data.number = 0;
+                                    array_setitem(&d->telopt.termtypes, &temp2, &temp1);
+                                    CLEAR(&temp1);
+                                } else if (d->telopt.termtypes_cnt > 1)  {
+                                    if (!*termtype) {
+                                        temp1.type = PROG_STRING;
+                                        temp1.data.string = termtype_init_state;
+                                        array_appenditem(&d->telopt.termtypes, &temp1);
+                                    } else {
+                                        temp1.type = PROG_STRING;
+                                        temp1.data.string = alloc_prog_string(termtype);
+                                        array_appenditem(&d->telopt.termtypes, &temp1);
+                                        CLEAR(&temp1);
+                                    }
+                                }
+
+
+                                if (!DR_RAW_FLAGS(d, DF_COMPRESS) && d->telopt.termtypes_cnt == 1) {
+#ifdef MCCP_ENABLED
+                                    /* Due to SimpleMU, we need to determine the termtype before we can enable MCCP. */
+                                    if (d->telopt.mccp && !d->mccp)
+                                        mccp_start(d, d->telopt.mccp);
+#endif
+                                }
+
+                                /* Request the next: IAC SB TERMTYPE SEND IAC SE */
+                                queue_write(d, "\xFF\xFA\x18\x01\xFF\xF0", 6);
+                            }
+
+                            //}
                         } /* else { */
                           /* An unsupported request/response happened */
                           /* This is where we would implement other sub-negotiation types. */
@@ -3916,7 +4046,7 @@ process_telnet_IAC(struct descriptor_data *d, char *q, char *p)
             d->telopt.mccp = 2;
                 
             /* Thanks to SimpleMU, we're required to know the termtype before we can enable MCCP. */
-            if (d->telopt.termtype && !d->mccp)
+            if (d->telopt.termtypes_cnt && !d->mccp)
                 mccp_start(d, d->telopt.mccp);
         } else if (*q == TELOPT_MSSP) {
             mssp_send(d);
@@ -4068,7 +4198,7 @@ process_input(struct descriptor_data *d)
                 }
             }
             p = d->raw_input;
-        } else if (process_telnet_IAC(d, q, p)) {
+        } else if (DR_RAW_FLAGS(d, DF_TELNET) && process_telnet_IAC(d, q, p)) {
             // This is where the telopt processing code used to be. It has been
             // moved to process_telnet_IAC to keep process_input cleaner.
             // It will return 0 if we should keep going.
@@ -4873,6 +5003,7 @@ close_sockets(const char *msg)
 #endif /* DESCRFILE_SUPPORT */
         host_delete(d->hu);
 
+        telopt_clean(&d->telopt);
         FREE(d);                         /****/
         ndescriptors--;                  /****/
     }
@@ -5004,19 +5135,23 @@ do_dinfo(dbref player, const char *arg)
                 d->connected ? ansi_unparse_object(player, d->player) : SYSGREEN
                 "[Connecting]", d->descriptor, ctype);
 
-    if (d->flags)
+    if (d->flags) {
         /* need to print out the flags */
         anotify_nolisten(player, descr_flag_description(d->descriptor), 1);
 
 	anotify_fmt(player, SYSAQUA "Termtype: "
                         SYSCYAN "%s    "
                         SYSAQUA "Encoding: "
-                        SYSCYAN" %s", 
-	    (d->telopt.termtype ? d->telopt.termtype : "<unknown>"),
+                        SYSCYAN "%s    "
+                        SYSAQUA "MTTS: " 
+                        SYSCYAN "%d",
+	    d->telopt.termtypes->data.packed[0].data.string->data,
 	    (d->encoding == ENC_RAW ? "RAW" :
             (d->encoding == ENC_ASCII ? "US-ASCII" :
-                 (d->encoding == ENC_UTF8 ? "UTF-8" : SYSRED "UNKNOWN"))));
+                 (d->encoding == ENC_UTF8 ? "UTF-8" : SYSRED "UNKNOWN"))),
+        d->telopt.mtts);
 	    //(d->encoding ? (d->encoding == ENC_ASCII ? "US-ASCII" : "UTF-8") : "RAW" ));
+    }
 
     if (Arch(player))
         anotify_fmt(player, SYSAQUA "Host: " SYSCYAN "%s" SYSBLUE "@"
@@ -7080,6 +7215,7 @@ mccp_start(struct descriptor_data *d, int version)
     z_stream *s;
     struct mccp *m;
     int opt = 0;
+    struct shared_string *termtype;
 
 #ifdef USE_SSL
     if (d->type == CT_SSL)
@@ -7090,9 +7226,12 @@ mccp_start(struct descriptor_data *d, int version)
     m->z = NULL;
     m->buf = NULL;
     m->version = 0;
+
+    termtype = d->telopt.termtypes->data.packed[0].data.string;
     
     /* log_status("MCCP_START(%d)\r\n", d->descriptor); */
-    opt = (d->telopt.termtype && !string_compare(d->telopt.termtype, "simplemu"));
+    opt = (termtype != termtype_init_state &&
+            !string_compare(termtype->data, "simplemu"));
     if (opt)
         setsockopt(d->descriptor, IPPROTO_TCP, TCP_NODELAY, (char *) &opt, sizeof(opt));
 
@@ -7182,15 +7321,41 @@ mccp_end(struct descriptor_data *d)
 
 #endif
 
+
+
+void
+termtypes_init(struct telopt *t)
+{
+    if (!termtype_init_state) {
+        termtype_init_state = alloc_prog_string("<unknown>");
+        /* By not de-incrementing the link count here, termtype_init will always
+         * be a minimum of 1. That's actually makes things simpler. */
+    }
+    if (t->termtypes) {
+        array_free(t->termtypes);
+    }
+    t->termtypes = new_array_packed(1);
+    t->termtypes->data.packed[0].type = PROG_STRING;
+    t->termtypes->data.packed[0].data.string = termtype_init_state;
+    termtype_init_state->links++;
+
+    t->termtypes_cnt = 0;
+}
+
 void
 telopt_init(struct telopt *t)
 {
+
     t->mccp = 0;
     t->sb_buf = NULL;
     t->sb_buf_len = 0;
-    t->termtype = NULL;
     t->width = 0;
     t->height = 0;
+    t->mtts = 0;
+    t->termtypes = NULL;
+    t->termtypes_cnt = 0;
+
+    termtypes_init(t);
 }
 
 void
@@ -7203,10 +7368,12 @@ telopt_clean(struct telopt *t)
     t->sb_buf_len = 0;
     t->width = 0;
     t->height = 0;
+    t->mtts = 0;
+    t->termtypes_cnt = 0;
 
-    if (t->termtype)
-        free((void *)t->termtype);
-    t->termtype = NULL;
+    // termtypes may persist in memory if link count >0, this is expected.
+    array_free(t->termtypes);
+    t->termtypes = NULL;
 }
 
 void
