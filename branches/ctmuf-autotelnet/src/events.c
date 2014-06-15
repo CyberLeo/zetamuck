@@ -27,7 +27,6 @@ next_dump_time(void)
     if (tp_dbdump_warning && !dump_warned) {
         if (((last_dump_time + tp_dump_interval) - tp_dump_warntime)
             < currtime) {
-            event_needs_delay = 0;
             return (0L);
         } else {
             return (last_dump_time + tp_dump_interval - tp_dump_warntime -
@@ -36,7 +35,6 @@ next_dump_time(void)
     }
 
     if ((last_dump_time + tp_dump_interval) < currtime)
-        event_needs_delay = 0;
         return (0L);
 
     return (last_dump_time + tp_dump_interval - currtime);
@@ -126,7 +124,6 @@ next_clean_time(void)
         last_clean_time = time((time_t *) NULL);
 
     if ((last_clean_time + tp_clean_interval) < currtime)
-        event_needs_delay = 0;
         return (0L);
 
     return (last_clean_time + tp_clean_interval - currtime);
@@ -171,7 +168,6 @@ next_cron_time()
         last_cron_time = time((time_t *) NULL);
 
     if ((last_cron_time + tp_cron_interval) < currtime)
-        event_needs_delay = 0;
         return (0L);
 
     return (last_cron_time + tp_cron_interval - currtime);
@@ -219,7 +215,6 @@ next_keepalive_time()
                 (last_keepalive_time + tp_keepalive_interval) < currtime) {
             last_keepalive_time = currtime;
             do_keepalive = 1;
-            event_needs_delay = 0;
             return (0L);
         }
         if (!(next_keepalive = last_keepalive_time + tp_keepalive_interval - currtime)) {
@@ -240,7 +235,6 @@ next_welcome_time()
 
     if (pending_welcomes) {
         if (next_welcome < currtime) {
-            event_needs_delay = 0;
             return (0L);
         }
         return (next_welcome - currtime); /* always 0-1, in theory */
@@ -266,7 +260,6 @@ next_archive_time()
         last_archive_time = time((time_t *) NULL);
 
     if ((last_archive_time + tp_archive_interval) < currtime)
-        event_needs_delay = 0;
         return (0L);
 
     return (last_archive_time + tp_archive_interval - currtime);
@@ -332,19 +325,22 @@ mintime(time_t a, time_t b)
     return ((b > a) && (a > -1) ? a : b);
 }
 
+#define RETURNIFZERO(i) if (!i) return i;
 
 time_t
 next_muckevent_time(void)
 {
     time_t nexttime = 1000L;
 
-    nexttime = mintime(next_event_time(), nexttime);
-    nexttime = mintime(next_dump_time(), nexttime);
-    nexttime = mintime(next_clean_time(), nexttime);
-    nexttime = mintime(next_cron_time(), nexttime);
-    nexttime = mintime(next_archive_time(), nexttime);
-    nexttime = mintime(next_keepalive_time(), nexttime);
-    nexttime = mintime(next_welcome_time(), nexttime);
+    RETURNIFZERO((nexttime = mintime(next_dump_time(), nexttime)));
+    RETURNIFZERO((nexttime = mintime(next_clean_time(), nexttime)));
+    RETURNIFZERO((nexttime = mintime(next_cron_time(), nexttime)));
+    RETURNIFZERO((nexttime = mintime(next_archive_time(), nexttime)));
+    RETURNIFZERO((nexttime = mintime(next_keepalive_time(), nexttime)));
+    RETURNIFZERO((nexttime = mintime(next_welcome_time(), nexttime)));
+    if (!(nexttime = mintime(next_event_time(), nexttime))) {
+        event_needs_delay=1;
+    }
 
     return (nexttime);
 }
