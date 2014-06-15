@@ -739,6 +739,7 @@ next_event_time(void)
         if (tqhead->when == -1) {
             return (-1L);
         } else if (rtime >= tqhead->when) {
+            event_needs_delay = 1;
             return (0L);
         } else {
             return ((time_t) (tqhead->when - rtime));
