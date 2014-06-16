@@ -325,19 +325,18 @@ mintime(time_t a, time_t b)
     return ((b > a) && (a > -1) ? a : b);
 }
 
-#define RETURNIFZERO(i) if (!i) return i;
 
 time_t
 next_muckevent_time(void)
 {
     time_t nexttime = 1000L;
 
-    RETURNIFZERO((nexttime = mintime(next_dump_time(), nexttime)));
-    RETURNIFZERO((nexttime = mintime(next_clean_time(), nexttime)));
-    RETURNIFZERO((nexttime = mintime(next_cron_time(), nexttime)));
-    RETURNIFZERO((nexttime = mintime(next_archive_time(), nexttime)));
-    RETURNIFZERO((nexttime = mintime(next_keepalive_time(), nexttime)));
-    RETURNIFZERO((nexttime = mintime(next_welcome_time(), nexttime)));
+    nexttime = mintime(next_dump_time(), nexttime);
+    nexttime = mintime(next_clean_time(), nexttime);
+    nexttime = mintime(next_cron_time(), nexttime);
+    nexttime = mintime(next_archive_time(), nexttime);
+    nexttime = mintime(next_keepalive_time(), nexttime);
+    nexttime = mintime(next_welcome_time(), nexttime);
     if (!(nexttime = mintime(next_event_time(), nexttime))) {
         event_needs_delay=1;
     }
