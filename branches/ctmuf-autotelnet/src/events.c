@@ -337,7 +337,8 @@ next_muckevent_time(void)
     nexttime = mintime(next_archive_time(), nexttime);
     nexttime = mintime(next_keepalive_time(), nexttime);
     nexttime = mintime(next_welcome_time(), nexttime);
-    if (!(nexttime = mintime(next_event_time(), nexttime))) {
+    // It's safe to skip next_event_time() if nexttime is already 0.
+    if (!nexttime && !(nexttime = mintime(next_event_time(), nexttime))) {
         event_needs_delay=1;
     }
 
