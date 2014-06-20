@@ -1,8 +1,0 @@
-{
-   PS_CLOBBER_ARGV
-   Memcheck:Leak
-   fun:malloc
-   fun:save_ps_display_args
-   fun:main
-}
-
