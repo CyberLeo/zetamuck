@@ -5148,7 +5148,7 @@ do_dinfo(dbref player, const char *arg)
             ctype = "unknown";
     }
 
-    anotify_fmt(player, "%s" SYSAQUA " descr " SYSYELLOW "%d" SYSBLUE " (%s)",
+    anotify_fmt(player, "%s"SYSAQUA " descr " SYSYELLOW "%d" SYSBLUE " (%s)",
                 d->connected ? ansi_unparse_object(player, d->player) : SYSGREEN
                 "[Connecting]", d->descriptor, ctype);
 
@@ -5157,12 +5157,17 @@ do_dinfo(dbref player, const char *arg)
         anotify_nolisten(player, descr_flag_description(d->descriptor), 1);
 
 	anotify_fmt(player, SYSAQUA "Termtype: "
-                        SYSCYAN "%s    "
-                        SYSAQUA "Encoding: "
-                        SYSCYAN "%s    "
-                        SYSAQUA "MTTS: " 
-                        SYSCYAN "%d",
+                        SYSCYAN "%-20s"
+                        SYSAQUA "Window: "
+                        SYSCYAN "%dx%d",
 	    d->telopt.termtypes->data.packed[0].data.string->data,
+        d->telopt.width, d->telopt.height);
+
+    anotify_fmt(player,
+                        SYSAQUA "Encoding: "
+                        SYSCYAN "%-20s"
+                        SYSAQUA "  MTTS: " 
+                        SYSCYAN "%d",
 	    (d->encoding == ENC_RAW ? "RAW" :
             (d->encoding == ENC_ASCII ? "US-ASCII" :
                  (d->encoding == ENC_UTF8 ? "UTF-8" : SYSRED "UNKNOWN"))),
