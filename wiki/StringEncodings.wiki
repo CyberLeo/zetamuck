@@ -36,7 +36,20 @@ UTF-8 is the encoding that doesn't play well with others. Arbitrary combinations
 
 ASCII, to contrast, plays well with everyone. You can append ASCII characters to any of the encodings mentioned above and always have a valid string.
 
-= Solution 1: Four types of strings =
+= Solution 1: Two types of strings =
+
+  * All strings generated via socket prims or file prims are assumed to be RAW strings.
+  * All strings obtained via MU clients are considered to be normal strings. (UTF-8 representations, converted from Latin-1 if necessary)
+  * String operations on RAW strings operate on byte indexes.
+  * String operations on normal strings operate on character indexes.
+  * Combining a RAW string with a normal string is a run-time error. They must be converted with new primitives first.
+
+Given the simplicity if this model, it's my current preference for implementation. It would be possible to implement the concept of raw strings without any UTF-8 specific coding, making it possible to test the implementation prior to overhauling the rest of the game to match.
+
+= Solution 2: Four types of strings =
+
+This is probably overkill.
+
 
 Any string type appended to the same string type remains the same.
 
@@ -73,16 +86,6 @@ Combining a RAW string with UTF-8 is potentially unsafe. For the sake of predict
     RAW +   UTF-8 = <ABORT>
   UTF-8 +     RAW = <ABORT>
 }}}
-
-= Solution 2: Two types of strings =
-
-  * All strings generated via socket prims or file prims are assumed to be RAW strings.
-  * All strings obtained via MU clients are considered to be normal strings. (UTF-8 representations, converted from Latin-1 if necessary)
-  * String operations on RAW strings operate on byte indexes.
-  * String operations on normal strings operate on character indexes.
-  * Combining a RAW string with a normal string is a run-time error. They must be converted with new primitives first.
-
-Given the simplicity if this model, it's my current preference for implementation. It would be possible to implement the concept of raw strings without any UTF-8 specific coding, making it possible to test the implementation prior to overhauling the rest of the game to match.
 
 = Prop Storage =
 
