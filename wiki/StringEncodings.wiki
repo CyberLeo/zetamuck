@@ -83,3 +83,9 @@ Combining a RAW string with UTF-8 is potentially unsafe. For the sake of predict
   * Combining a RAW string with a normal string is a run-time error. They must be converted with new primitives first.
 
 Given the simplicity if this model, it's my current preference for implementation. It would be possible to implement the concept of raw strings without any UTF-8 specific coding, making it possible to test the implementation prior to overhauling the rest of the game to match.
+
+= Prop Storage =
+
+Regardless of implementation, it will necessary to be able to track the type of string being stored in a prop for sanity's sake.
+
+Currently there is a single prop flag used for tracking strings, `PROP_STRTYPE` (defined in `inc/props.h`). To avoid needless code duplication, it's probably better to avoid defining a new type entirely and instead use a flag that denotes raw as an additional storage characteristic of `PROP_STRTYPE`.
