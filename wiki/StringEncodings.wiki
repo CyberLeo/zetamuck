@@ -16,7 +16,7 @@ Example:
 
 Up until now, MUCK has only had to deal with single byte encodings. We can derive three basic string manipulation problems from this:
   * The `STRCAT` MUF prim has functioned under the assumption that any freeform combination of bytes is legal...which may be true for binary and ISO-8859-1, but not UTF-8. It's no longer feasible for `STRCAT` to simply smash bytes together blindly.
-  * `STRLEN` has always returned the length of a string. The ☺ character is _one_ UTF-8 character, but `STRLEN` would consider that to have a length of _three_ because it required three bytes to represent it.
+  * `STRLEN` has always returned the length of a string. The ☺ character is _one_ UTF-8 character, but `STRLEN` would consider that to have a length of _three_ because it required three bytes to represent it. We now have to differentiate whether the index is referring to a byte position or a character position.
   * `STRCUT` likewise assumes that it's no big deal to arbitrarily split a string in half. `"foobar" 1 strcut` yields the strings `"f"` and `"oobar"`, which is fine. Performing `☺ 1 strcut` would yield two garbage UTF-8 sequences. Whoops. :(
 
 
