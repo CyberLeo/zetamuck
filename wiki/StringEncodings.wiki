@@ -88,4 +88,6 @@ Given the simplicity if this model, it's my current preference for implementatio
 
 Regardless of implementation, it will necessary to be able to track the type of string being stored in a prop for sanity's sake.
 
-Currently there is a single prop flag used for tracking strings, `PROP_STRTYPE` (defined in `inc/props.h`). To avoid needless code duplication, it's probably better to avoid defining a new type entirely and instead use a flag that denotes raw as an additional storage characteristic of `PROP_STRTYPE`.
+Currently there is a single prop flag used for tracking strings, `PROP_STRTYPE` (defined in `inc/props.h`). To avoid needless code duplication, it's probably better to avoid defining a new prop types entirely and instead use any new flags to denote additional characteristics of the existing `PROP_STRTYPE`.
+
+There _should_ be some sort of visual way of distinguishing these string types from each other when examining a propdir. (probably by adjusting the `(str)` readout slightly)
