@@ -38,6 +38,7 @@ ZetaMUCK will implement the following color conversions:
 
 ZetaMUCK will not implement the following color conversions:
   * 256 → MXP
+  * MXP → 256 (not a part of the standard anyway)
 
 The only MXP client commonly used with ZetaMUCK (and ProtoMUCK) is MUSHclient, which supports the 256 color scheme in addition to MXP. While we may implement support for MXP at a later date, MXP without 256 color support is an extremely unlikely scenario given that it takes MU client authors more work to implement MXP.
 
