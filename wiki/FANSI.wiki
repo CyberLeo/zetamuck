@@ -4,6 +4,10 @@ This document outlines ZetaMUCK's compliance status with the [http://www.fansi.o
 
 ZetaMUCK is unlikely to ever be fully FANSI compliant. Our desired approach is to use the parts of the specification that add the most value to the user, and gloss over any parts that would require coding time to solve challenges that don't really apply to us.
 
+= Current Status =
+
+*Planning.* This document covers the intended future design, but work has not yet started.
+
 = What is FANSI? =
 
 `FANSI 2.0 is an enhanced ANSI Art specification for MUDs (multi-user dungeons) that allows 256 colors and 151 extended characters. A freeware mouse-driven drawing application, MUSHii, is also available to assist with the creation of FANSI art.`
