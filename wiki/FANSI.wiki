@@ -1,3 +1,5 @@
+#summary Notes on compliance with the FANSI Specification
+
 = Intro =
 
 This document outlines ZetaMUCK's compliance status with the [http://www.fansi.org/Specification.aspx FANSI Specification].
