@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#summary Strategy for supporting multiple character sets
 
 = Introduction =
 
