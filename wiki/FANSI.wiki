@@ -22,7 +22,7 @@ ZetaMUCK will implement the following character sets:
 
   * US-ASCII (classic 7-bit)
   * BINARY (file and socket I/O)
-  * ISO-8859-1 (Latin-1)
+  * ISO-8859-1 (Latin-1, excluding character 255)
   * UTF-8
 
 ZetaMUCK will not implement the following character set:
