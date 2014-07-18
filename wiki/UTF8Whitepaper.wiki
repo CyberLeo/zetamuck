@@ -97,8 +97,8 @@ Unicode has some additional considerations, such as illegal multi-byte sequences
 ==Input Filtering==
 Processing input is a slightly easier affair:
 
-* If the byte is not legal for the negotiated character set and not part of an IAC escape sequence, it should be discarded as garbage.
-* In addition to any special escaping that your codebase currently implements, it is strongly recommended to accept UCN escaped characters as described in previous sections.
+ * If the byte is not legal for the negotiated character set and not part of an IAC escape sequence, it should be discarded as garbage.
+ * In addition to any special escaping that your codebase currently implements, it is strongly recommended to accept UCN escaped characters as described in previous sections.
 
 
 
