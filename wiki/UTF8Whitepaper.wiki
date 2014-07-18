@@ -18,6 +18,7 @@ The first thing you need to decide is what encodings you intend to allow as inpu
 AKA Latin-1. Characters above point 127 are selectively interpreted as Latin characters. It should be noted that the ÿ character at code point 255 is the same byte used to represent Telnet IAC; special considerations involving the translation of this character will be covered later.
 
 Invalid bytes: 127-159
+
 IAC+IAC handling: ÿ
 
 This is the most common interpretation of characters 128-255 by clients that have not negotiated a state with the server.
@@ -26,12 +27,14 @@ This is the most common interpretation of characters 128-255 by clients that hav
 AKA ASCII. This should be considered the "safe" encoding; characters above code point 127 are garbage outside of IAC escape sequences.
 
 Invalid bytes: 127-255
+
 IAC+IAC handling: garbage
 
  * [https://en.wikipedia.org/wiki/UTF-8 UTF-8]
 This is what most players and game authors are thinking about when they discuss Unicode support. UTF-8 is backwards compatible with US-ASCII for code points 0-127, and uses special sequences of bytes 128-244 to represent other character sets.
 
 Invalid bytes: 192-193, 245-255, invalid multi-byte sequences
+
 IAC+IAC handling: garbage
 
  * Optional: [https://en.wikipedia.org/wiki/Code_page_437 IBM478]
@@ -41,6 +44,7 @@ AKA IBM Code Page 478, AKA CP478, AKA OEM478. This character set is popular with
 It should be noted that unlike all of the character sets above, bytes 1-31 are not reserved for control codes and can be used at 
 
 Invalid bytes: None
+
 IAC+IAC handling: garbage 
 
 == Default Encoding ==
