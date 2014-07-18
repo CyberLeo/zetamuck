@@ -66,8 +66,6 @@ Before we get into the subject of how to filter your input and output streams, i
 
 Most of the recommendations in this document build on the character remappings defined by the FANSI standard, with some additional considerations based on the assumption that most Unicode aware fonts will implement [https://en.wikipedia.org/wiki/Windows_Glyph_List_4 WGL4] characters at a bare minimum.
 
-
-
 ==Universal Markup==
 The choice of whether to render a question mark for a byte that cannot be translated or dropped entirely is a debated one. This author is of the particular mindset that ordinary users do not get much value from seeing streams of question marks rendered to their screen. Not only this, there needs to be a way for users on more limited encodings to interact with shared data fields such as room descriptions. In the interests of achieving both goals, the following "contexts" are defined:
 
@@ -77,7 +75,7 @@ The choice of whether to render a question mark for a byte that cannot be transl
 
 It is recommended to never render question marks in a Rendering Context. These are not of much use to third party observers, and are somewhat jarring in collaborative roleplay environments.
 
-In an Examine Context, it is _strongly recommended_ to not render question marks but instead output the characters in a Universal Character Name (UCN) escaped format, similar to how they can be legally used within the source code of C (C99 standard) and C++. These take the form of a `\u` sequence followed by a four digit number (for the Basic Plane), or a '\U' sequence followed by an eight digit number (for the Supplementary Planes). Support for rendering the Basic Plane using the `\U` syntax should be implemented, but its use by users should be discouraged.
+In an Examine Context, it is _strongly recommended_ to not render question marks but instead output the characters in a Universal Character Name (UCN) escaped format, similar to how they can be legally used within the source code of C (C99 standard) and C++. These take the form of a `\u` sequence followed by a four digit number (for the Basic Plane), or a `\U` sequence followed by an eight digit number (for the Supplementary Planes). Support for rendering the Basic Plane using the `\U` syntax should be implemented, but its use by users should be discouraged.
 
 Example: ☺ (3 bytes: e2 98 ba) cannot be rendered to a US-ASCII or ISO-8859-1 descriptor, but can be safely rendered as `\u263A` or `\U0010263A` (overkill).
 
