@@ -14,7 +14,7 @@ Each connection to the game should have its own configured encoding. A given pla
 The first thing you need to decide is what encodings you intend to allow as input. I recommend that you keep this small, and avoid deviating from the following list. I cover individual bytes that should be discarded below, but I do not go into the subject of control characters 0-31 + 127 (you are assumed to know this), or invalid UTF-8 sequencing (which will be covered later).
 
 
-* ISO-8859 https://en.wikipedia.org/wiki/ISO/IEC_8859-1
+ * [https://en.wikipedia.org/wiki/ISO/IEC_8859-1 ISO-8859]
 AKA Latin-1. Characters above point 127 are selectively interpreted as Latin characters. It should be noted that the ÿ character at code point 255 is the same byte used to represent Telnet IAC; special considerations involving the translation of this character will be covered later.
 
 Invalid bytes: 127-159
@@ -22,19 +22,19 @@ IAC+IAC handling: ÿ
 
 This is the most common interpretation of characters 128-255 by clients that have not negotiated a state with the server.
 
-* US-ASCII
+ * US-ASCII
 AKA ASCII. This should be considered the "safe" encoding; characters above code point 127 are garbage outside of IAC escape sequences.
 
 Invalid bytes: 127-255
 IAC+IAC handling: garbage
 
-* UTF-8 https://en.wikipedia.org/wiki/UTF-8
+ * [https://en.wikipedia.org/wiki/UTF-8 UTF-8]
 This is what most players and game authors are thinking about when they discuss Unicode support. UTF-8 is backwards compatible with US-ASCII for code points 0-127, and uses special sequences of bytes 128-244 to represent other character sets.
 
 Invalid bytes: 192-193, 245-255, invalid multi-byte sequences
 IAC+IAC handling: garbage
 
-* Optional: IBM478 https://en.wikipedia.org/wiki/Code_page_437
+ * Optional: [https://en.wikipedia.org/wiki/Code_page_437 IBM478]
 
 AKA IBM Code Page 478, AKA CP478, AKA OEM478. This character set is popular within the MUD community for the purpose of art creation, but is unlikely to be seen outside of those circles. Use your discretion when choosing to implement this, as supporting it adds additional complexity to the tasks ahead that are otherwise avoidable.
 
@@ -49,20 +49,20 @@ Most clients connecting to your game will not negotiate an encoding. For these y
 == Negotiating Encoding ==
 There are two recommended methods. The UTF-8 feature advertised by these features is usually a user preference: the client may support UTF-8 and have a useful font selected, or the user may have no idea what they're doing. There is nothing that can be done about this. If the client has asked for UTF-8 and you are sending a valid byte stream, it's not your problem to deal with.
 
-* MTTS http://tintin.sourceforge.net/mtts/
+ * [http://tintin.sourceforge.net/mtts/ MTTS]
 This method is preferred over the TELNET CHARSET option due to its simplicity, and the fact that it can also negotiate support for 256 colors at welcome screen time. Two desirable features for the price of one.
 
 The only downside is that this is not backed by a RFC. That said, neither is 256 color support, or numerous other MUD extensions.
 
-* TELNET CHARSET http://tools.ietf.org/html/rfc2066
+ * [http://tools.ietf.org/html/rfc2066 TELNET CHARSET]
 This method is endorsed by an RFC with an Experimental status. It's not an accepted Standard, but it's the closest you're going to see to one. This takes more work to implement, and not many clients support this. Your call.
 
 ==Font Considerations==
 Before we get into the subject of how to filter your input and output streams, it's important to understand that the usefulness of Unicode is largely constrained by the font support in your userbase. It is only as good as your least common denominator font. Outside of shipping a custom client for your game (which not everyone will use), or endorsing an official font for the game (which most people will ignore), this is nothing you have control over.
 
-Most of the recommendations in this document build on the character remappings defined by the FANSI standard, with some additional considerations based on the assumption that most Unicode aware fonts will implement WGL4 characters at a bare minimum.
+Most of the recommendations in this document build on the character remappings defined by the FANSI standard, with some additional considerations based on the assumption that most Unicode aware fonts will implement [https://en.wikipedia.org/wiki/Windows_Glyph_List_4 WGL4] characters at a bare minimum.
 
-https://en.wikipedia.org/wiki/Windows_Glyph_List_4
+
 
 ==Universal Markup==
 The choice of whether to render a question mark for a byte that cannot be translated or dropped entirely is a debated one. This author is of the particular mindset that ordinary users do not get much value from seeing streams of question marks rendered to their screen. Not only this, there needs to be a way for users on more limited encodings to interact with shared data fields such as room descriptions. In the interests of achieving both goals, the following "contexts" are defined:
