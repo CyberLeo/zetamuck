@@ -10,7 +10,7 @@ This document is broken up into documentation for servers and clients, prefaced 
 The recommendations below are derived from Unicode.org's [http://www.unicode.org/faq/private_use.html Private-Use Characters, Noncharacters & Sentinels FAQ].
 
 == Interpretation of Private Use Characters ==
-The interpretation of Private Use Characters should be defined by the administrator's of a game, and no limitations on their interchange should be imposed by client or server software. An unmodified client will not render these characters in any useful way (most clients will see the replacement character, �), but if a Star Trek themed game is interested in implementing one of the Klingon alphabets, there is no reason to stand in the way of custom clients or client plugins being able to implement this functionality.
+The interpretation of Private Use Characters should be defined by the administrators of a game, and no limitations on their interchange should be imposed by client or server software. An unmodified client will not render these characters in any useful way (most clients will see the replacement character, �). That said, if a Star Trek themed game is interested in implementing one of the Klingon alphabets, there is no reason to stand in the way of custom clients or client plugins being able to implement this functionality.
 
 == Interpretation of Noncharacters ==
 This whitepaper recommends that Unicode noncharacters be classified as _internal to the application_, whether that application be a client or a server. The meaning of noncharacters is defined by the respective software maintainers and _must not_ be exchanged in the game's primary user I/O loop.
