@@ -13,7 +13,9 @@ The recommendations below are derived from Unicode.org's [http://www.unicode.org
 The interpretation of Private Use Characters should be defined by the administrator's of a game, and no limitations on their interchange should be imposed by client or server software. An unmodified client will not render these characters in any useful way (most clients will see the replacement character, �), but if a Star Trek themed game is interested in implementing one of the Klingon alphabets, there is no reason to stand in the way of custom clients or client plugins being able to implement this functionality.
 
 == Interpretation of Noncharacters ==
-The usage of Unicode noncharacters _must_ be defined by the maintainers of server software and _must not_ be defined by the maintainers of client software. They can be used for any internal purpose that requires dedicated internal characters. The most common use would be internal escape characters that are not defined by US-ASCII or Unicode. In this fashion noncharacters are similar to how the 8th bit of ASCII could be utilized in the early days of computing (history lesson: [https://en.wikipedia.org/wiki/8-bit_clean 8-bit cleanliness]), with the following caveats:
+This whitepaper recommends that Unicode noncharacters be classified as _internal to the application_, whether that application be a client or a server. Their meaning is defined by the respective software maintainers and _must not_ be exchanged with other software.
+
+Noncharacters can be used for any internal purpose that requires dedicated internal characters. The most common use would be internal escape characters that are not defined by US-ASCII or Unicode. In this fashion noncharacters are similar to how the 8th bit of ASCII could be utilized in the early days of computing (history lesson: [https://en.wikipedia.org/wiki/8-bit_clean 8-bit cleanliness]), with the following caveats:
 
  * Noncharacters within the Unicode standards are protected, and will never be reclassified. (unlike ASCII's 8th bit)
  * Noncharacters encode at least three characters, and are not as space efficient.
@@ -24,7 +26,7 @@ Games _must_ treat these characters as "zero width" in a character context, and 
 
 Games _may_ define a subset of noncharacters that can be manipulated by softcode and/or the game administrators, but there should _never_ be an expectation that those characters will be received as input from a client.
 
-A game _may_ choose to selectively render these characters to a client that has been customized for that specific game, with the understanding that most clients will discard them, but the practice is strongly discouraged. 
+A game _may_ choose to selectively render these characters to a client that has been customized for that specific game, with the understanding that most clients will discard them. The practice is strongly discouraged. 
 
 = The Server =
 The basic rules are pretty well-known. The server itself must implement a Unicode aware encoding, and translate input from all descriptors into a Unicode format. This can be wchar_t strings, UTF-8 encoded C strings, whatever floats your boat.
